@@ -1,0 +1,100 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Surfaces */
+  --bg: #0E1B2E;
+  --surface: #15243C;
+  --surface-2: #1D3151;
+  --paper: #F5EFE2;
+  --paper-edge: #EAE3D2;
+
+  /* Ink (on paper) */
+  --ink: #1B1410;
+  --ink-soft: #3C3128;
+  --ink-muted: #6A5D52;
+
+  /* Text (on dark) */
+  --text: #E9E2D2;
+  --text-muted: #9DA9C0;
+  --text-faint: #5B6B86;
+
+  /* Accents */
+  --gold: #D4A24C;
+  --gold-bright: #E8B95A;
+  --gold-deep: #A37C2B;
+  --teal: #4A9D9C;
+  --rust: #B25542;
+  --moss: #6A8B5A;
+
+  /* Tier colors */
+  --tier-bronze: #B87333;
+  --tier-silver: #B8B8B8;
+  --tier-gold: #D4A24C;
+  --tier-platinum: #DCE6F5;
+
+  /* Effects */
+  --shadow-card: 0 2px 16px rgba(0,0,0,0.35), 0 1px 0 rgba(255,255,255,0.04) inset;
+  --shadow-paper: 0 18px 40px rgba(0,0,0,0.45), 0 1px 0 rgba(255,255,255,0.5) inset;
+
+  color-scheme: dark;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* { box-sizing: border-box; }
+
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+body {
+  overscroll-behavior-y: contain;
+}
+
+/* Paper texture utility — ruled lines, ~5% opacity */
+.bg-paper-texture {
+  background-color: var(--paper);
+  background-image:
+    repeating-linear-gradient(
+      to bottom,
+      transparent 0,
+      transparent 31px,
+      rgba(27, 20, 16, 0.06) 31px,
+      rgba(27, 20, 16, 0.06) 32px
+    );
+}
+
+/* Writing textarea reset — make spellcheck markers subtle */
+textarea.writing-surface {
+  font-family: 'Lora', Georgia, serif;
+  font-size: 1.125rem;
+  line-height: 1.75;
+  background: transparent;
+  resize: vertical;
+  outline: none;
+  border: none;
+  width: 100%;
+  color: var(--ink);
+}
+
+textarea.writing-surface::placeholder {
+  color: var(--ink-muted);
+  font-style: italic;
+}
+
+/* Disable iOS tap-highlight on buttons */
+button { -webkit-tap-highlight-color: transparent; }
+
+/* Hide number-input spinners */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+input[type="number"] { -moz-appearance: textfield; }
