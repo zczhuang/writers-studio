@@ -1,6 +1,7 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useApp } from './state/AppContext';
 import { Shell } from './components/Shell';
+import { AppLockScreen, APP_UNLOCK_KEY } from './screens/AppLockScreen';
 import { HomeScreen } from './screens/HomeScreen';
 import { ModeListScreen } from './screens/ModeListScreen';
 import { WriteScreen } from './screens/WriteScreen';
@@ -16,9 +17,17 @@ import { BADGES } from './data/badges';
 import { pushToast } from './hooks/useToast';
 
 export function App() {
+  const [unlocked, setUnlocked] = useState<boolean>(() => {
+    try { return localStorage.getItem(APP_UNLOCK_KEY) === '1'; } catch { return false; }
+  });
+
+  if (!unlocked) return <AppLockScreen onUnlock={() => setUnlocked(true)} />;
+  return <UnlockedApp />;
+}
+
+function UnlockedApp() {
   const { state, dispatch } = useApp();
 
-  // Re-check achievements after any meaningful state change
   useEffect(() => {
     const have = new Set(state.writer.achievements.map((a) => a.id));
     const newlyEarned = BADGES.filter((b) => !have.has(b.id) && b.check(state)).map((b) => b.id);
@@ -29,7 +38,6 @@ export function App() {
     }
   }, [state.writer.totalChallenges, state.writer.totalWords, state.writer.streak, state.entries.length, state.earnings.lifetimePaid, state.writer.modesPlayed.length, dispatch]);
 
-  // Onboarding takes over the screen with no shell
   if (state.screen === 'onboarding') return <OnboardingScreen />;
 
   return (
