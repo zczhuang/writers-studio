@@ -3,8 +3,23 @@ import { CLICHES, SENSORY, SENSORY_BY_SENSE, STRONG_VERBS, VAGUE, senseOf } from
 import { clamp, countWords, sentenceLengths, splitSentences, stdev, tokens, typeTokenRatio } from '../utils/text';
 import { normalizeJudge } from './scoring';
 
-// Match "like X" where X is descriptive — exclude verb-uses like "I like", "would like", "didn't like"
-const SIMILE_LIKE = /(?<!\b(?:i|you|they|she|he|we|would|don't|didn't|do|does|will|might|may|could|never|ever|just))\s+like\s+(?:a|an|the\s+)?[a-z]+/i;
+// Match "X like Y" where X is descriptive context, not a verb use of "like".
+// Implemented WITHOUT lookbehind because iOS Safari <16.4 (and iPad Chrome on
+// those versions, since iOS Chrome uses WebKit) throws a SyntaxError at parse
+// time on lookbehind regex literals — that would crash the entire bundle.
+const SIMILE_LIKE_CANDIDATE = /([a-z']+)?\s+like\s+(?:a|an|the\s+)?[a-z]+/gi;
+const SIMILE_LIKE_SKIP_PREV = new Set([
+  'i','you','they','she','he','we','would','do','does','did',
+  "don't",'dont',"didn't",'didnt','will','might','may','could',
+  'never','ever','just','should','must',
+]);
+function hasSimileLike(text: string): boolean {
+  for (const m of text.matchAll(SIMILE_LIKE_CANDIDATE)) {
+    const prev = (m[1] ?? '').toLowerCase();
+    if (!SIMILE_LIKE_SKIP_PREV.has(prev)) return true;
+  }
+  return false;
+}
 const SIMILE_AS = /\bas\s+[a-z]+\s+as\s+(?:a|an|the\s+)?[a-z]+/i;
 const METAPHOR = /\b(?:was|were|is|are)\s+(?:a|an)\s+[a-z]+/i;
 const DIALOGUE = /["“"][^"“”]{2,200}["”"]/g;
@@ -91,7 +106,7 @@ function dimensions(text: string, counts: Counts): JudgeBreakdown {
 
   // Originality
   let origin = 0;
-  if (SIMILE_LIKE.test(text) || SIMILE_AS.test(text)) origin += 3;
+  if (hasSimileLike(text) || SIMILE_AS.test(text)) origin += 3;
   if (METAPHOR.test(text)) origin += 3;
   if (counts.strong >= 2) origin += 2;
   if (clicheCount(text) === 0) origin += 2;
