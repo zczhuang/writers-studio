@@ -76,7 +76,7 @@ export function JournalScreen() {
               <span className="text-text-muted tabular-nums">{entry.wordCount} words</span>
             </div>
             <p className="text-caption text-text-faint italic">{entry.prompt}</p>
-            <hr className="border-white/8" />
+            <hr className="border-line" />
             <p className="font-serif text-body text-text whitespace-pre-wrap leading-relaxed">{entry.text}</p>
             {entry.judge.celebrate && (
               <div className="bg-gold/10 border border-gold/25 rounded-lg p-3 flex items-start gap-2">
@@ -98,7 +98,7 @@ function Chip({ label, active, onClick, count }: { label: string; active: boolea
       className={`shrink-0 px-3 py-1.5 rounded-full text-caption font-medium border transition-colors ${
         active
           ? 'bg-gold text-ink border-gold'
-          : 'bg-surface text-text-muted border-white/8 hover:border-white/15'
+          : 'bg-surface text-text-muted border-line hover:border-line-2'
       }`}
     >
       {label} <span className="opacity-70 ml-1">{count}</span>

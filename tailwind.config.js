@@ -21,6 +21,8 @@ export default {
         teal: 'var(--teal)',
         rust: 'var(--rust)',
         moss: 'var(--moss)',
+        line: 'var(--line)',
+        'line-2': 'var(--line-2)',
         tier: {
           bronze: 'var(--tier-bronze)',
           silver: 'var(--tier-silver)',
@@ -47,7 +49,7 @@ export default {
       boxShadow: {
         card: 'var(--shadow-card)',
         paper: 'var(--shadow-paper)',
-        'gold-glow': '0 0 24px rgba(212,162,76,0.35)',
+        'gold-glow': '0 6px 20px rgba(192,135,31,0.28)',
       },
       animation: {
         'tier-shimmer': 'shimmer 1.8s ease-out',

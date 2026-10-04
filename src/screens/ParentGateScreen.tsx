@@ -1,9 +1,15 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ShieldCheck, AlertTriangle } from 'lucide-react';
 import { useApp } from '../state/AppContext';
 import { PinPad } from '../components/ui/PinPad';
 import { verifyPin } from '../services/pinHash';
 import { Button } from '../components/ui/Button';
+import {
+  browserDeadlineRuntime,
+  parentAccessIsActive,
+  remainingCooldownSeconds,
+  startDeadlineWatcher,
+} from '../services/accessTiming';
 
 const PARENT_UNLOCK_MS = 10 * 60 * 1000;
 
@@ -13,11 +19,38 @@ export function ParentGateScreen() {
   const [error, setError] = useState('');
   const attempts = useRef(0);
   const [lockedUntil, setLockedUntil] = useState(0);
+  const [clockNow, setClockNow] = useState(() => Date.now());
 
-  const lockedRemainingSec = Math.max(0, Math.ceil((lockedUntil - Date.now()) / 1000));
+  useEffect(() => {
+    if (lockedUntil <= 0) return;
+    return startDeadlineWatcher({
+      deadlineMs: lockedUntil,
+      tickEveryMs: 1000,
+      runtime: browserDeadlineRuntime(),
+      onTime: (nowMs) => {
+        setClockNow(nowMs);
+        if (!parentAccessIsActive(lockedUntil, nowMs)) {
+          setLockedUntil(0);
+          setError('');
+        }
+      },
+    });
+  }, [lockedUntil]);
+
+  const lockedRemainingSec = remainingCooldownSeconds(lockedUntil, clockNow);
 
   const submit = async (pin: string) => {
-    if (lockedRemainingSec > 0) return;
+    const attemptNow = Date.now();
+    if (parentAccessIsActive(lockedUntil, attemptNow)) {
+      setClockNow(attemptNow);
+      setShake((value) => value + 1);
+      return;
+    }
+    if (lockedUntil !== 0) {
+      setLockedUntil(0);
+      setError('');
+    }
+
     const ok = await verifyPin(pin, state.settings.parentPinSalt, state.settings.parentPinHash ?? '');
     if (ok) {
       attempts.current = 0;
@@ -29,7 +62,9 @@ export function ParentGateScreen() {
       attempts.current += 1;
       setShake((s) => s + 1);
       if (attempts.current >= 3) {
-        setLockedUntil(Date.now() + 30_000);
+        const failureNow = Date.now();
+        setClockNow(failureNow);
+        setLockedUntil(failureNow + 30_000);
         setError('Too many wrong PINs. Wait 30s.');
         attempts.current = 0;
       } else {

@@ -9,6 +9,7 @@ import { ResultScreen } from './screens/ResultScreen';
 import { WalletScreen } from './screens/WalletScreen';
 import { JournalScreen } from './screens/JournalScreen';
 import { BadgesScreen } from './screens/BadgesScreen';
+import { CraftLibraryScreen } from './screens/CraftLibraryScreen';
 import { ParentGateScreen } from './screens/ParentGateScreen';
 import { ParentDashboardScreen } from './screens/ParentDashboardScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
@@ -36,7 +37,7 @@ function UnlockedApp() {
       const def = BADGES.find((b) => b.id === newlyEarned[0]);
       if (def) pushToast(`Achievement: ${def.name}`, 'success');
     }
-  }, [state.writer.totalChallenges, state.writer.totalWords, state.writer.streak, state.entries.length, state.earnings.lifetimePaid, state.writer.modesPlayed.length, dispatch]);
+  }, [state, dispatch]);
 
   if (state.screen === 'onboarding') return <OnboardingScreen />;
 
@@ -57,6 +58,7 @@ function ScreenRouter() {
     case 'wallet': return <WalletScreen />;
     case 'journal': return <JournalScreen />;
     case 'badges': return <BadgesScreen />;
+    case 'craft-library': return <CraftLibraryScreen />;
     case 'parent-gate': return <ParentGateScreen />;
     case 'parent-dashboard': return <ParentDashboardScreen />;
     case 'settings': return <SettingsScreen />;

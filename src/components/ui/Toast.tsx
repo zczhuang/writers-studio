@@ -6,7 +6,7 @@ export function ToastHost() {
   return (
     <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[1000] flex flex-col gap-2 pointer-events-none w-full max-w-md px-4">
       {queue.map((t) => {
-        const tone = t.tone === 'success' ? 'bg-moss/95 text-paper' : t.tone === 'warn' ? 'bg-rust/95 text-paper' : 'bg-surface-2/95 text-text border border-white/10';
+        const tone = t.tone === 'success' ? 'bg-moss/95 text-paper' : t.tone === 'warn' ? 'bg-rust/95 text-paper' : 'bg-surface-2/95 text-text border border-line-2';
         const Icon = t.tone === 'success' ? CheckCircle2 : t.tone === 'warn' ? AlertTriangle : Info;
         return (
           <div

@@ -11,11 +11,12 @@ export function EarningsPill() {
   return (
     <button
       onClick={() => dispatch({ type: 'NAV', screen: 'wallet' })}
-      className={`flex items-center gap-2 rounded-full px-3 py-1.5 border transition-colors ${
+      className={`min-h-[44px] shrink-0 whitespace-nowrap flex items-center gap-2 rounded-full px-3 py-1.5 border transition-colors ${
         cap.capHit
           ? 'bg-rust/15 border-rust/40 text-rust'
-          : 'bg-surface border-white/10 text-gold hover:border-gold/40'
+          : 'bg-surface border-line-2 text-gold hover:border-gold/40'
       }`}
+      aria-label={`Today's earnings ${cap.earnedToday.toFixed(2)} dollars out of ${cap.cap.toFixed(2)}`}
     >
       <Coins size={14} />
       <span className="font-mono font-semibold text-caption tabular-nums">

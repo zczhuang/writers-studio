@@ -8,13 +8,17 @@ interface Props {
 }
 
 export function PinPad({ onSubmit, length = 4, shake = false }: Props) {
-  const [pin, setPin] = useState('');
+  const [pinState, setPinState] = useState(() => ({ resetSignal: shake, value: '' }));
   const [bumping, setBumping] = useState(false);
   const submitting = useRef(false);
+  const pin = pinState.resetSignal === shake ? pinState.value : '';
 
-  useEffect(() => {
-    setPin('');
-  }, [shake]);
+  const updatePin = (update: (current: string) => string) => {
+    setPinState((current) => ({
+      resetSignal: shake,
+      value: update(current.resetSignal === shake ? current.value : ''),
+    }));
+  };
 
   useEffect(() => {
     if (pin.length === length && !submitting.current) {
@@ -26,11 +30,11 @@ export function PinPad({ onSubmit, length = 4, shake = false }: Props) {
   }, [pin, length, onSubmit]);
 
   const tap = (digit: string) => {
-    setPin((p) => (p.length < length ? p + digit : p));
+    updatePin((current) => (current.length < length ? current + digit : current));
     setBumping(true);
     window.setTimeout(() => setBumping(false), 80);
   };
-  const back = () => setPin((p) => p.slice(0, -1));
+  const back = () => updatePin((current) => current.slice(0, -1));
 
   return (
     <div className={shake ? 'animate-shake' : ''}>
@@ -40,7 +44,7 @@ export function PinPad({ onSubmit, length = 4, shake = false }: Props) {
           return (
             <span
               key={i}
-              className={`w-3.5 h-3.5 rounded-full transition-colors ${filled ? 'bg-gold' : 'bg-surface-2 border border-white/15'} ${bumping && i === pin.length - 1 ? 'scale-110' : ''}`}
+              className={`w-3.5 h-3.5 rounded-full transition-colors ${filled ? 'bg-gold' : 'bg-surface-2 border border-line-2'} ${bumping && i === pin.length - 1 ? 'scale-110' : ''}`}
               style={{ transition: 'transform 80ms ease' }}
             />
           );
@@ -51,7 +55,7 @@ export function PinPad({ onSubmit, length = 4, shake = false }: Props) {
           <button
             key={n}
             onClick={() => tap(String(n))}
-            className="bg-surface-2 hover:bg-surface text-text font-display text-h1 font-semibold py-3 rounded-xl border border-white/8 active:scale-95 transition-transform"
+            className="bg-surface-2 hover:bg-surface text-text font-display text-h1 font-semibold py-3 rounded-xl border border-line active:scale-95 transition-transform"
           >
             {n}
           </button>
@@ -59,13 +63,13 @@ export function PinPad({ onSubmit, length = 4, shake = false }: Props) {
         <span />
         <button
           onClick={() => tap('0')}
-          className="bg-surface-2 hover:bg-surface text-text font-display text-h1 font-semibold py-3 rounded-xl border border-white/8 active:scale-95 transition-transform"
+          className="bg-surface-2 hover:bg-surface text-text font-display text-h1 font-semibold py-3 rounded-xl border border-line active:scale-95 transition-transform"
         >
           0
         </button>
         <button
           onClick={back}
-          className="bg-surface-2 hover:bg-surface text-text-muted py-3 rounded-xl border border-white/8 active:scale-95 transition-transform flex items-center justify-center"
+          className="bg-surface-2 hover:bg-surface text-text-muted py-3 rounded-xl border border-line active:scale-95 transition-transform flex items-center justify-center"
           aria-label="Backspace"
         >
           <Delete size={20} />

@@ -33,6 +33,8 @@ export interface Entry {
   wordCount: number;
   judge: JudgeResult;
   earningsId: string;
+  /** How many times this piece has been revised and resubmitted (0 = first draft). */
+  revisionCount?: number;
 }
 
 export interface LedgerEntry {
@@ -61,6 +63,45 @@ export interface ActiveQuest {
   questId: string;
   completedSteps: string[];
   startedAt: number;
+}
+
+/**
+ * Persistent writer-memory: the coach's running sense of THIS writer, built up
+ * across every graded piece. It personalizes feedback, drives the "did you
+ * grow?" callback, and powers adaptive prompt + skill recommendations. It never
+ * changes a score — only tone, targeting, and which suggestion is emphasized.
+ * Stays fully on-device (part of the localStorage AppState).
+ */
+export interface WriterMemory {
+  /** EWMA of each dimension's 0–10 score — the coach's read on current skill. */
+  mastery: JudgeBreakdown;
+  /** How many graded pieces have been folded in (confidence / warm-up gate). */
+  sampleCount: number;
+  /** Pieces written per mode. */
+  piecesByMode: Record<Mode, number>;
+  /** Strongest / weakest dimension right now (derived from mastery). */
+  strength: keyof JudgeBreakdown | null;
+  growthEdge: keyof JudgeBreakdown | null;
+  /** The dimension the coach last targeted in each mode — basis of the "did you grow?" callback. */
+  growthTargetByMode: Partial<Record<Mode, keyof JudgeBreakdown>>;
+  /** Set after each fold: did the writer improve on the dimension we last targeted? */
+  lastGrowth: { dimension: keyof JudgeBreakdown; improved: boolean; mode: Mode } | null;
+  /** A small vault of vivid words the writer has used well. */
+  vocabularyVault: string[];
+  /** Skill-card ids recently surfaced as "recommended" (ring buffer) to avoid repeats. */
+  recentlyShownSkills: string[];
+  /** Source of the last recommended card, so recommendations alternate classic/contemporary. */
+  lastSkillSource: 'classic' | 'contemporary' | null;
+  bestScore: number;
+  updatedAt: number;
+}
+
+/** Progress through the Craft Skills library (separate from coaching memory). */
+export interface CraftState {
+  /** Skill-card ids the writer has opened/practiced at least once. */
+  practicedSkills: string[];
+  /** Skill-card ids the writer has marked as mastered. */
+  masteredSkills: string[];
 }
 
 export interface WriterState {
@@ -96,16 +137,19 @@ export type Screen =
   | 'wallet'
   | 'journal'
   | 'badges'
+  | 'craft-library'
   | 'parent-gate'
   | 'parent-dashboard'
   | 'settings'
   | 'onboarding';
 
 export interface AppState {
-  version: 2;
+  version: 3;
   writer: WriterState;
   earnings: Earnings;
   entries: Entry[];
+  memory: WriterMemory;
+  craft: CraftState;
   settings: Settings;
   // Ephemeral (not persisted):
   screen: Screen;
@@ -114,6 +158,8 @@ export interface AppState {
   currentChallengeId: string | null;
   lastJudge: JudgeResult | null;
   lastEntryId: string | null;
+  /** When set, the WriteScreen is revising this existing entry rather than starting fresh. */
+  revisingEntryId: string | null;
   parentUnlockedUntil: number;
   /** When parent-gate succeeds, where to navigate next. */
   parentGateTarget: Screen | null;
@@ -126,6 +172,10 @@ export interface Challenge {
   questions?: string[];
   targetWords: [number, number];
   skill: string;
+  /** Optional foreign key into SKILL_CARDS — the craft technique this prompt best exercises. */
+  skillId?: string;
+  /** Dimension(s) this prompt most exercises — used for adaptive prompt selection. */
+  dimensions?: (keyof JudgeBreakdown)[];
   visual?: string;
   original?: string;
   hint?: string;

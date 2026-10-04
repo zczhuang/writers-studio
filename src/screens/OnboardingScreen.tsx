@@ -176,7 +176,7 @@ export function OnboardingScreen() {
 
 function Card({ children }: { children: React.ReactNode }) {
   return (
-    <div className="bg-surface border border-white/8 rounded-2xl p-6 shadow-card animate-slide-up">
+    <div className="bg-surface border border-line rounded-2xl p-6 shadow-card animate-slide-up">
       {children}
     </div>
   );

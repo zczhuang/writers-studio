@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Coins, Lock } from 'lucide-react';
 import { useApp } from '../state/AppContext';
 import { useDailyCap } from '../hooks/useDailyCap';
@@ -16,19 +16,35 @@ const TIER_CLASS: Record<Tier, string> = {
   platinum: 'text-tier-platinum',
 };
 
+function parentAccessIsActive(until: number): boolean {
+  return until > Date.now();
+}
+
 export function WalletScreen() {
   const { state, dispatch } = useApp();
   const cap = useDailyCap();
-  const isParent = state.parentUnlockedUntil > Date.now();
   const [selecting, setSelecting] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [authNow, setAuthNow] = useState(() => Date.now());
+  const isParent = state.parentUnlockedUntil > authNow;
+
+  useEffect(() => {
+    const remaining = state.parentUnlockedUntil - Date.now();
+    if (remaining <= 0) return;
+    const timeout = window.setTimeout(() => {
+      setAuthNow(Date.now());
+      setSelecting(false);
+      setSelected(new Set());
+    }, remaining + 25);
+    return () => window.clearTimeout(timeout);
+  }, [state.parentUnlockedUntil]);
 
   const ledger = [...state.earnings.ledger].sort((a, b) => b.createdAt - a.createdAt);
   const pending = ledger.filter((l) => l.status === 'pending');
   const selectableTotal = pending.filter((l) => selected.has(l.id)).reduce((s, l) => s + l.amount, 0);
 
   const startPayout = () => {
-    if (!isParent) {
+    if (!parentAccessIsActive(state.parentUnlockedUntil)) {
       dispatch({ type: 'REQUEST_PARENT_GATE', target: 'wallet' });
       return;
     }
@@ -37,6 +53,12 @@ export function WalletScreen() {
   };
 
   const confirmPayout = () => {
+    if (!parentAccessIsActive(state.parentUnlockedUntil)) {
+      setSelecting(false);
+      setSelected(new Set());
+      dispatch({ type: 'REQUEST_PARENT_GATE', target: 'wallet' });
+      return;
+    }
     dispatch({ type: 'PAY_LEDGER', ids: [...selected] });
     setSelecting(false);
     setSelected(new Set());
@@ -57,7 +79,7 @@ export function WalletScreen() {
         <p className="text-text-muted text-caption mt-1">Your earnings, ready for payout.</p>
       </header>
 
-      <section className="bg-surface border border-white/5 rounded-2xl p-6">
+      <section className="bg-surface border border-line rounded-2xl p-6">
         <div className="text-micro text-text-faint uppercase tracking-wider font-semibold mb-1">Pending</div>
         <div className="font-mono text-display font-semibold text-gold tabular-nums leading-none">
           ${state.earnings.lifetimePending.toFixed(2)}
@@ -76,7 +98,7 @@ export function WalletScreen() {
         </div>
       </section>
 
-      <section className="bg-surface border border-white/5 rounded-xl p-4">
+      <section className="bg-surface border border-line rounded-xl p-4">
         <div className="flex items-center justify-between text-caption mb-2">
           <span className="text-text-muted">Today's progress</span>
           <span className="font-mono tabular-nums text-text">${cap.earnedToday.toFixed(2)} / ${cap.cap.toFixed(2)}</span>
@@ -124,7 +146,7 @@ export function WalletScreen() {
                   onClick={() => selecting && l.status === 'pending' && toggle(l.id)}
                   className={`bg-surface border rounded-xl p-3 flex items-center justify-between gap-3 transition-colors ${
                     selecting && l.status === 'pending' ? 'cursor-pointer' : ''
-                  } ${isSelected ? 'border-gold/60 bg-gold/5' : 'border-white/5'}`}
+                  } ${isSelected ? 'border-gold/60 bg-gold/5' : 'border-line'}`}
                 >
                   <div className="min-w-0 flex-1">
                     <div className="text-caption text-text-muted truncate">{entry?.challengeTitle ?? 'Entry'}</div>

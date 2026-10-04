@@ -22,7 +22,7 @@ export function EntryCard({ entry, onClick }: Props) {
   return (
     <button
       onClick={onClick}
-      className="w-full text-left bg-surface border border-white/5 rounded-xl p-4 hover:border-gold/30 transition-colors"
+      className="w-full text-left bg-surface border border-line rounded-xl p-4 hover:border-gold/30 transition-colors"
     >
       <div className="flex items-center justify-between text-caption mb-2">
         <span className="text-text-muted font-medium">{meta.label} · {entry.challengeTitle}</span>

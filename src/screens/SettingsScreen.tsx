@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { KeyRound, ShieldCheck, Coins, RotateCcw, ExternalLink, Download, Lock, AlertTriangle, Loader2, CheckCircle2 } from 'lucide-react';
 import { useApp } from '../state/AppContext';
 import { Button } from '../components/ui/Button';
@@ -7,16 +7,10 @@ import { hashPin, makeSalt } from '../services/pinHash';
 import { pushToast } from '../hooks/useToast';
 import { testGeminiKey } from '../services/gemini';
 import { clearPersistence } from '../state/persistence';
+import { browserDeadlineRuntime, parentAccessIsActive, startDeadlineWatcher } from '../services/accessTiming';
 
 export function SettingsScreen() {
   const { state, dispatch } = useApp();
-  const isParent = state.parentUnlockedUntil > Date.now();
-
-  if (!isParent) {
-    dispatch({ type: 'REQUEST_PARENT_GATE', target: 'settings' });
-    return null;
-  }
-
   const [name, setName] = useState(state.writer.name);
   const [apiKey, setApiKey] = useState(state.settings.geminiApiKey ?? '');
   const [model, setModel] = useState(state.settings.geminiModel);
@@ -28,14 +22,40 @@ export function SettingsScreen() {
   const [testing, setTesting] = useState(false);
   const [keyOk, setKeyOk] = useState<null | boolean>(null);
   const [confirmReset, setConfirmReset] = useState(false);
+  const [authNow, setAuthNow] = useState(() => Date.now());
+  const isParent = state.parentUnlockedUntil > authNow;
+
+  useEffect(
+    () =>
+      startDeadlineWatcher({
+        deadlineMs: state.parentUnlockedUntil,
+        onTime: setAuthNow,
+        runtime: browserDeadlineRuntime(),
+      }),
+    [state.parentUnlockedUntil]
+  );
+
+  useEffect(() => {
+    if (!isParent) dispatch({ type: 'REQUEST_PARENT_GATE', target: 'settings' });
+  }, [dispatch, isParent]);
+
+  if (!isParent) return null;
+
+  const ensureParentAccess = () => {
+    if (parentAccessIsActive(state.parentUnlockedUntil)) return true;
+    dispatch({ type: 'REQUEST_PARENT_GATE', target: 'settings' });
+    return false;
+  };
 
   const save = () => {
+    if (!ensureParentAccess()) return;
     dispatch({ type: 'UPDATE_WRITER', patch: { name: name.trim() || 'Writer' } });
     dispatch({ type: 'SET_SETTINGS', settings: { geminiApiKey: apiKey.trim() || null, geminiModel: model.trim() || 'gemini-2.5-flash', dailyCapDollars: cap, capBehavior } });
     pushToast('Settings saved.', 'success');
   };
 
   const changePin = async () => {
+    if (!ensureParentAccess()) return;
     if (newPin.length !== 4 || !/^\d{4}$/.test(newPin)) {
       pushToast('PIN must be 4 digits.', 'warn');
       return;
@@ -46,6 +66,7 @@ export function SettingsScreen() {
     }
     const salt = makeSalt();
     const hash = await hashPin(newPin, salt);
+    if (!ensureParentAccess()) return;
     dispatch({ type: 'SET_SETTINGS', settings: { parentPinHash: hash, parentPinSalt: salt } });
     setPinMode('none');
     setNewPin('');
@@ -54,16 +75,22 @@ export function SettingsScreen() {
   };
 
   const testKey = async () => {
+    if (!ensureParentAccess()) return;
     if (!apiKey.trim()) return;
     setTesting(true);
     setKeyOk(null);
     const ok = await testGeminiKey(apiKey.trim(), model.trim() || 'gemini-3.1-flash-lite');
+    if (!ensureParentAccess()) {
+      setTesting(false);
+      return;
+    }
     setKeyOk(ok);
     setTesting(false);
     pushToast(ok ? 'API key works.' : 'API key didn\'t work — check it.', ok ? 'success' : 'warn');
   };
 
   const exportData = () => {
+    if (!ensureParentAccess()) return;
     const blob = new Blob([JSON.stringify({ writer: state.writer, earnings: state.earnings, entries: state.entries }, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -73,6 +100,7 @@ export function SettingsScreen() {
   };
 
   const doReset = () => {
+    if (!ensureParentAccess()) return;
     clearPersistence();
     dispatch({ type: 'RESET_ALL' });
     pushToast('Everything reset. Fresh start.', 'info');
@@ -137,14 +165,14 @@ export function SettingsScreen() {
         <div className="mt-4 grid grid-cols-2 gap-2">
           <button
             onClick={() => setCapBehavior('forfeit')}
-            className={`p-3 rounded-lg border text-left ${capBehavior === 'forfeit' ? 'border-gold bg-gold/10 text-text' : 'border-white/10 text-text-muted'}`}
+            className={`p-3 rounded-lg border text-left ${capBehavior === 'forfeit' ? 'border-gold bg-gold/10 text-text' : 'border-line-2 text-text-muted'}`}
           >
             <div className="font-semibold text-caption">Forfeit</div>
             <div className="text-micro text-text-faint">Keep writing past cap — no extra $.</div>
           </button>
           <button
             onClick={() => setCapBehavior('lock')}
-            className={`p-3 rounded-lg border text-left ${capBehavior === 'lock' ? 'border-gold bg-gold/10 text-text' : 'border-white/10 text-text-muted'}`}
+            className={`p-3 rounded-lg border text-left ${capBehavior === 'lock' ? 'border-gold bg-gold/10 text-text' : 'border-line-2 text-text-muted'}`}
           >
             <div className="font-semibold text-caption">Lock</div>
             <div className="text-micro text-text-faint">Block submit until tomorrow.</div>
@@ -214,7 +242,7 @@ export function SettingsScreen() {
 
 function Section({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
   return (
-    <section className="bg-surface border border-white/5 rounded-xl p-5">
+    <section className="bg-surface border border-line rounded-xl p-5">
       <div className="flex items-center gap-2 mb-3 text-gold">
         {icon}
         <h2 className="font-display text-h3 font-semibold text-text">{title}</h2>

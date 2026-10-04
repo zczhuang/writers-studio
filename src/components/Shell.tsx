@@ -1,5 +1,5 @@
-import type { ReactNode } from 'react';
-import { ChevronLeft, Wallet, BookMarked, Award, Settings as SettingsIcon, Home as HomeIcon } from 'lucide-react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { Award, BookMarked, BookOpen, ChevronLeft, Home as HomeIcon, Library, Settings as SettingsIcon, Wallet } from 'lucide-react';
 import { useApp } from '../state/AppContext';
 import { EarningsPill } from './EarningsPill';
 import { ToastHost } from './ui/Toast';
@@ -11,46 +11,72 @@ export function Shell({ children }: { children: ReactNode }) {
   const { state, dispatch } = useApp();
   const showBack = state.navStack.length > 0 && state.screen !== 'onboarding';
   const hideNav = HIDE_NAV_ON.includes(state.screen);
+  const [clockMs, setClockMs] = useState(0);
+  const mainRef = useRef<HTMLElement>(null);
 
-  const isParent = state.parentUnlockedUntil > Date.now();
+  useEffect(() => {
+    const firstCheck = window.setTimeout(() => setClockMs(Date.now()), 0);
+    const interval = window.setInterval(() => setClockMs(Date.now()), 30_000);
+    return () => {
+      window.clearTimeout(firstCheck);
+      window.clearInterval(interval);
+    };
+  }, []);
+
+  const isParent = clockMs > 0 && state.parentUnlockedUntil > clockMs;
+  const readableScreen = ['write', 'result', 'journal', 'craft-library', 'parent-dashboard', 'settings'].includes(state.screen);
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    const active = document.activeElement;
+    if (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement || active?.getAttribute('contenteditable') === 'true') return;
+    mainRef.current?.focus({ preventScroll: true });
+  }, [state.screen]);
+
+  const mainClass = readableScreen ? 'atlas-main atlas-main-reading' : 'atlas-main';
 
   return (
     <div className="min-h-screen bg-bg text-text flex flex-col">
-      <header className="sticky top-0 z-40 bg-bg border-b border-white/5">
-        <div className="max-w-2xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-3">
+      <header className="atlas-header">
+        <div className={`atlas-header-inner ${showBack ? 'has-back' : ''}`}>
           <div className="flex items-center gap-2 min-w-0">
-            {showBack ? (
-              <button
-                onClick={() => dispatch({ type: 'NAV_BACK' })}
-                className="flex items-center gap-1 text-text-muted hover:text-text transition-colors -ml-1 px-1.5 py-1 rounded"
-                aria-label="Back"
-              >
-                <ChevronLeft size={20} />
+            {showBack && (
+              <button onClick={() => dispatch({ type: 'NAV_BACK' })} className="atlas-back-button" aria-label="Back">
+                <ChevronLeft size={20} aria-hidden="true" />
                 <span className="text-caption hidden sm:inline">Back</span>
               </button>
-            ) : (
-              <span className="font-display text-h2 font-semibold tracking-tight text-text">
-                Writer's Studio
-                {isParent && <span className="ml-2 text-caption font-sans text-gold/90">· parent</span>}
-              </span>
             )}
+            <div className="atlas-brand">
+              <span className="atlas-brand-mark" aria-hidden="true"><BookOpen size={19} /></span>
+              <span className="atlas-brand-copy">
+                <span className="atlas-brand-title">Writer&apos;s Studio</span>
+                <span className="atlas-brand-subtitle">your story atlas</span>
+              </span>
+              {isParent && <span className="text-caption font-sans text-gold-deep">· parent</span>}
+            </div>
           </div>
           <EarningsPill />
         </div>
       </header>
 
-      <main className="flex-1 max-w-2xl w-full mx-auto px-4 sm:px-6 py-6 pb-32 animate-fade-in">
+      <main ref={mainRef} id="main-content" tabIndex={-1} className={`flex-1 ${mainClass} animate-fade-in`}>
         {children}
       </main>
 
       {!hideNav && (
-        <nav className="fixed bottom-0 left-0 right-0 z-40 bg-bg/95 backdrop-blur-sm border-t border-white/5">
-          <div className="max-w-2xl mx-auto px-2 grid grid-cols-4 gap-1 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+        <nav className="atlas-nav" aria-label="Main navigation">
+          <div className="atlas-nav-inner">
             <NavItem
               icon={<HomeIcon size={20} />}
               label="Home"
               active={state.screen === 'home'}
               onClick={() => dispatch({ type: 'NAV_RESET', screen: 'home' })}
+            />
+            <NavItem
+              icon={<Library size={20} />}
+              label="Craft"
+              active={state.screen === 'craft-library'}
+              onClick={() => dispatch({ type: 'NAV', screen: 'craft-library' })}
             />
             <NavItem
               icon={<Wallet size={20} />}
@@ -86,12 +112,11 @@ function NavItem({ icon, label, active, onClick }: { icon: ReactNode; label: str
   return (
     <button
       onClick={onClick}
-      className={`flex flex-col items-center justify-center gap-1 py-1.5 rounded-lg transition-colors ${
-        active ? 'text-gold' : 'text-text-faint hover:text-text-muted'
-      }`}
+      className={`atlas-nav-item ${active ? 'is-active' : ''}`}
+      aria-current={active ? 'page' : undefined}
     >
       {icon}
-      <span className="text-micro font-medium uppercase tracking-wide">{label}</span>
+      <span className="atlas-nav-label">{label}</span>
     </button>
   );
 }

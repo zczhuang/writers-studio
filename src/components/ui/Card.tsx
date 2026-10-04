@@ -6,14 +6,14 @@ interface Props extends HTMLAttributes<HTMLDivElement> {
 }
 
 const variants = {
-  surface: 'bg-surface border border-white/5 shadow-card',
-  'surface-2': 'bg-surface-2 border border-white/5 shadow-card',
+  surface: 'bg-surface border border-line shadow-card',
+  'surface-2': 'bg-surface-2 border border-line shadow-card',
   paper: 'bg-paper text-ink shadow-paper',
 };
 
 export function Card({ variant = 'surface', children, className = '', ...rest }: Props) {
   return (
-    <div {...rest} className={`rounded-xl p-6 ${variants[variant]} ${className}`}>
+    <div {...rest} className={`rounded-2xl p-6 ${variants[variant]} ${className}`}>
       {children}
     </div>
   );

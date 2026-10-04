@@ -1,8 +1,9 @@
 import type { AppState } from '../types';
+import { emptyMemory } from '../services/writerMemory';
 
 export const STORAGE_KEY = 'ws_state_v2';
 export const DRAFT_PREFIX = 'ws_draft_';
-export const CURRENT_VERSION = 2 as const;
+export const CURRENT_VERSION = 3 as const;
 
 export function makeInitialState(): AppState {
   return {
@@ -27,6 +28,8 @@ export function makeInitialState(): AppState {
       lifetimePending: 0,
     },
     entries: [],
+    memory: emptyMemory(),
+    craft: { practicedSkills: [], masteredSkills: [] },
     settings: {
       parentPinHash: null,
       parentPinSalt: '',
@@ -42,6 +45,7 @@ export function makeInitialState(): AppState {
     currentChallengeId: null,
     lastJudge: null,
     lastEntryId: null,
+    revisingEntryId: null,
     parentUnlockedUntil: 0,
     parentGateTarget: null,
   };

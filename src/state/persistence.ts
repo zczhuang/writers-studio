@@ -1,5 +1,6 @@
-import type { AppState } from '../types';
+import type { AppState, Entry } from '../types';
 import { CURRENT_VERSION, STORAGE_KEY, makeInitialState } from './initialState';
+import { buildMemory } from '../services/writerMemory';
 
 const EPHEMERAL: (keyof AppState)[] = [
   'screen',
@@ -8,6 +9,7 @@ const EPHEMERAL: (keyof AppState)[] = [
   'currentChallengeId',
   'lastJudge',
   'lastEntryId',
+  'revisingEntryId',
   'parentUnlockedUntil',
   'parentGateTarget',
 ];
@@ -24,6 +26,16 @@ export function persist(state: AppState): void {
 
 const migrations: Record<number, (s: Record<string, unknown>) => Record<string, unknown>> = {
   2: (s) => s,
+  // v3: persistent writer-memory + craft-library progress. Backfill memory from
+  // any existing entries so returning writers get a populated coach immediately.
+  3: (s) => {
+    const entries = Array.isArray(s.entries) ? (s.entries as Entry[]) : [];
+    return {
+      ...s,
+      memory: buildMemory(entries),
+      craft: { practicedSkills: [], masteredSkills: [] },
+    };
+  },
 };
 
 export function hydrate(): AppState {
@@ -44,6 +56,8 @@ export function hydrate(): AppState {
       ...migrated,
       writer: { ...fresh.writer, ...(migrated.writer ?? {}) },
       earnings: { ...fresh.earnings, ...(migrated.earnings ?? {}) },
+      memory: { ...fresh.memory, ...(migrated.memory ?? {}) },
+      craft: { ...fresh.craft, ...(migrated.craft ?? {}) },
       settings: { ...fresh.settings, ...(migrated.settings ?? {}) },
       entries: Array.isArray(migrated.entries) ? migrated.entries : [],
       // ephemeral defaults
@@ -53,6 +67,7 @@ export function hydrate(): AppState {
       currentChallengeId: null,
       lastJudge: null,
       lastEntryId: null,
+      revisingEntryId: null,
       parentUnlockedUntil: 0,
       parentGateTarget: null,
     };
