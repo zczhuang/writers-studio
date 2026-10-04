@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Award, BookMarked, BookOpen, ChevronLeft, Home as HomeIcon, Library, Settings as SettingsIcon, Wallet } from 'lucide-react';
+import { Award, BookMarked, BookOpen, ChevronLeft, Home as HomeIcon, Library, Settings as SettingsIcon, ShieldCheck, Wallet } from 'lucide-react';
 import { useApp } from '../state/AppContext';
 import { EarningsPill } from './EarningsPill';
 import { ToastHost } from './ui/Toast';
@@ -40,7 +40,7 @@ export function Shell({ children }: { children: ReactNode }) {
     <div className="min-h-screen bg-bg text-text flex flex-col">
       <header className="atlas-header">
         <div className={`atlas-header-inner ${showBack ? 'has-back' : ''}`}>
-          <div className="flex items-center gap-2 min-w-0">
+          <div className="atlas-header-brand-group flex items-center gap-2 min-w-0">
             {showBack && (
               <button onClick={() => dispatch({ type: 'NAV_BACK' })} className="atlas-back-button" aria-label="Back">
                 <ChevronLeft size={20} aria-hidden="true" />
@@ -53,10 +53,23 @@ export function Shell({ children }: { children: ReactNode }) {
                 <span className="atlas-brand-title">Writer&apos;s Studio</span>
                 <span className="atlas-brand-subtitle">your story atlas</span>
               </span>
-              {isParent && <span className="text-caption font-sans text-gold-deep">· parent</span>}
+              {isParent && <span className="atlas-parent-marker text-caption font-sans text-gold-deep">· parent</span>}
             </div>
           </div>
           <div className="atlas-header-actions">
+            <button
+              type="button"
+              onClick={() => {
+                if (isParent) dispatch({ type: 'NAV', screen: 'parent-dashboard' });
+                else dispatch({ type: 'REQUEST_PARENT_GATE', target: 'parent-dashboard' });
+              }}
+              className="atlas-parent-action atlas-back-button shrink-0 gap-1 px-2 text-caption font-semibold whitespace-nowrap"
+              aria-label={isParent ? 'Open parent dashboard' : 'Unlock parent mode'}
+              aria-current={state.screen === 'parent-dashboard' ? 'page' : undefined}
+            >
+              <ShieldCheck size={16} aria-hidden="true" />
+              <span className="atlas-parent-action-label">Parent</span>
+            </button>
             <CloudStatusBadge />
             <EarningsPill />
           </div>

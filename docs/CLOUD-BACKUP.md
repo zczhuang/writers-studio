@@ -1,12 +1,12 @@
 # Writer's Studio cloud backup
 
-> Last updated: 2026-10-03
+> Last updated: 2026-10-04
 
 Writer's Studio is offline-first. Local saves remain authoritative while offline, and the Supabase layer adds private backup, recovery, and multi-device merging without asking the child for an email address.
 
 ## Setup checklist
 
-1. Create a dedicated Supabase project. Do not share a project that contains unrelated customer data.
+1. Prefer a dedicated Supabase project. Reusing an existing owner-controlled project requires explicit owner approval, a namespace/RPC collision check, and an audit of unrelated tables, RLS, and privileges. Keep the migration confined to Writer's Studio objects and verify those existing protections are unchanged afterward.
 2. Enable anonymous sign-ins in Supabase Auth. Anonymous users receive the `authenticated` Postgres role; the migration grants `anon` no data access.
 3. Apply `supabase/migrations/202610030001_writers_studio_cloud_history.sql` through the normal reviewed migration workflow.
 4. Copy `.env.example` to `.env` for local development and set:
@@ -118,4 +118,19 @@ The repository tests cover the pure merge/sync controller and SQL contract, but 
 8. Reset creates a new lineage; delayed old responses do not revive it, and the old recovery code still reaches the old backups.
 9. Clear a second browser, restore with the recovery code, and verify the Journal, counters, ledger, memory, craft, and revision history round-trip.
 
-Until those live checks pass, the implementation is build/test verified but cloud saving is not operationally verified.
+A successful build or isolated SQL test alone does not establish live cloud saving. Record provider and browser evidence, and distinguish controls tested locally from those exercised against the provisioned service.
+
+
+## Production activation, 2026-10-04
+
+The owner approved reusing the existing **llc-expenses** Supabase project (`eldhxmvtpqhqmoryoukx`) for Writer's Studio. The additive migration created only Writer's Studio tables, private helpers, and RPCs. A before/after metadata comparison confirmed that existing finance tables, RLS, privileges, indexes, constraints, functions, and event triggers were unchanged. Only the anonymous-sign-in Auth flag changed; the private schema remains outside the exposed PostgREST schemas. No Mandarin Quest resource was accessed or changed.
+
+Production Vercel configuration uses only the project's public URL and publishable key. Credentials such as service-role keys, management tokens, parent PINs, and AI keys are not build variables or cloud payload fields.
+
+The actual app's synthetic browser check migrated a version-3 save, uploaded it, reloaded it, and restored it into a fresh browser through Parent Settings. It retained 345 XP, 987 first-draft words, 12 pieces, two entries and their versions, one coaching-memory sample, and the paid/pending ledger balances without replaying rewards. Local parent-PIN material remained local. An always-available Parent action makes recovery reachable even on a fresh device with zero pending earnings.
+
+The live Supabase SDK matrix passed 125 assertions across six payload states, three anonymous identities, and two generated spaces. It verified isolation in both directions across all six exposed tables; denied direct INSERT/PATCH and foreign-space RPCs; exact retries and request binding; stale CAS conflict archival and convergent merge; terminal paid-row immutability; incorrect/correct recovery; and failed-claim cooldown enforcement. No destructive DELETE probe was run; the catalog audit verified no direct DELETE grant. The 15-minute cooldown's elapsed expiry was not waited out. Browser checks exercised actual migration, upload, reload, and fresh-device recovery. Offline concurrent edits, reset-response fences, and SQL races also have application/controller and isolated PostgreSQL coverage; this activation did not repeat every such scenario against live Supabase.
+
+Application checks passed 101/101, with zero-warning lint and a production build. The isolated PostgreSQL harness had separately passed 134 assertions. Mobile home and settings headers were checked at 375 pixels, including the locked/unlocked Parent gate.
+
+These checks used generated test writing. They do not establish whether Leeann's older Chromebook save still exists. Open the game on her original Chromebook browser/profile and the same original hostname, then wait for **Cloud saved**. The existing `ws_state_v2` data imports automatically. Keep the browser data until that acknowledgement appears, and save the private recovery code from Parent Settings for future devices. Unfinished drafts still remain device-local.
