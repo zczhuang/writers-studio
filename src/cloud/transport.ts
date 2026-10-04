@@ -1,6 +1,15 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { CloudPayload, EntryVersionUpload } from './model';
 import { stableStringify } from '../utils/stable';
+import {
+  CloudAccessLostError,
+  CloudSetupRequiredError,
+  MissingCloudSessionError,
+  isAnonymousDisabledError,
+  isSessionLossError,
+} from './errors';
+
+export { CloudAccessLostError, CloudSetupRequiredError, MissingCloudSessionError } from './errors';
 
 export interface CloudHead {
   status: 'ok';
@@ -66,13 +75,6 @@ let singleton: SupabaseClient | null = null;
 let singletonKey = '';
 const sessionInitializations = new WeakMap<object, Promise<void>>();
 
-export class MissingCloudSessionError extends Error {
-  constructor() {
-    super('The existing cloud history is not signed in on this device. Use its recovery code.');
-    this.name = 'MissingCloudSessionError';
-  }
-}
-
 export interface SessionAuthAdapter {
   getSession(): Promise<{ data: { session: unknown | null }; error: unknown | null }>;
   signInAnonymously(): Promise<{ error: unknown | null }>;
@@ -88,11 +90,16 @@ export function ensureTransportSession(
   if (active) return active;
   const initialization = (async () => {
     const { data, error } = await auth.getSession();
-    if (error) throw error;
-    if (data.session) return;
+    // A dead refresh token is reported as an error with no session: the stale session is already
+    // gone, so treat it like "not signed in" instead of failing every future sync.
+    const sessionLost = !!error && isSessionLossError(error);
+    if (error && !sessionLost) throw error;
+    if (data.session && !sessionLost) return;
     if (!allowAnonymousBootstrap) throw new MissingCloudSessionError();
     const signedIn = await auth.signInAnonymously();
-    if (signedIn.error) throw signedIn.error;
+    if (signedIn.error) {
+      throw isAnonymousDisabledError(signedIn.error) ? new CloudSetupRequiredError() : signedIn.error;
+    }
   })();
   sessionInitializations.set(identity, initialization);
   void initialization.finally(() => {
@@ -149,7 +156,14 @@ export function createSupabaseTransport(config: SupabaseConfig): CloudTransport 
     if (!result.error) return result.data;
     // A stale/expired device token gets one refresh attempt. Local data is never changed here.
     const refreshed = await client.auth.refreshSession();
-    if (refreshed.error) throw result.error;
+    if (refreshed.error) {
+      if (isSessionLossError(refreshed.error)) {
+        // Drop only the dead sign-in so the sync engine can relink with the stored recovery code.
+        await client.auth.signOut({ scope: 'local' }).catch(() => undefined);
+        throw new MissingCloudSessionError();
+      }
+      throw result.error;
+    }
     const retry = await client.rpc(name, args);
     if (retry.error) throw retry.error;
     return retry.data;
@@ -173,6 +187,7 @@ export function createSupabaseTransport(config: SupabaseConfig): CloudTransport 
     async pull(spaceId) {
       const data = await rpc('get_writer_space_state', { p_space_id: spaceId }, false);
       const row = rpcObject(data);
+      if (row.status === 'forbidden') throw new CloudAccessLostError();
       if (row.status !== 'ok') throw new Error('Cloud history is not available for this device.');
       if (
         typeof row.space_id !== 'string' ||

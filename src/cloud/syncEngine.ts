@@ -3,6 +3,7 @@ import { hasMeaningfulProgress } from '../state/normalization';
 import { sha256Hex, stableStringify } from '../utils/stable';
 import { cloudPayloadToState, entryVersionUploads, mergeAppStates, toCloudPayload, type CloudPayload } from './model';
 import type { CloudTransport } from './transport';
+import { isAnonymousDisabledError, isSessionLossError } from './errors';
 import {
   generateRecoveryCode,
   normalizeRecoveryCode,
@@ -10,7 +11,15 @@ import {
   type CloudLocalMeta,
 } from './recovery';
 
-export type CloudPhase = 'unavailable' | 'device-only' | 'offline' | 'connecting' | 'saving' | 'saved' | 'error';
+export type CloudPhase =
+  | 'unavailable'
+  | 'device-only'
+  | 'setup-needed'
+  | 'offline'
+  | 'connecting'
+  | 'saving'
+  | 'saved'
+  | 'error';
 
 export interface CloudStatus {
   phase: CloudPhase;
@@ -32,6 +41,21 @@ export interface SyncEngineOptions {
   isOnline: () => boolean;
   onStatus: (status: CloudStatus) => void;
   nowIso?: () => string;
+  /** Schedules an automatic retry and returns a cancel function. Defaults to setTimeout. */
+  scheduleRetry?: (callback: () => void, delayMs: number) => () => void;
+}
+
+/** Backoff for automatic retries after a failed cloud save; the last delay repeats. */
+export const RETRY_DELAYS_MS = [4_000, 15_000, 45_000, 120_000, 300_000];
+/** A project that refuses anonymous sign-ins is rechecked rarely; a parent fixes it in Supabase. */
+export const SETUP_RETRY_MS = 300_000;
+const MAX_RELINKS_PER_DRAIN = 2;
+
+function defaultScheduleRetry(callback: () => void, delayMs: number): () => void {
+  const handle: unknown = globalThis.setTimeout(callback, delayMs);
+  // Node timers would otherwise keep a test process alive; browsers return a number.
+  if (handle && typeof handle === 'object' && 'unref' in handle && typeof handle.unref === 'function') handle.unref();
+  return () => globalThis.clearTimeout(handle as ReturnType<typeof setTimeout>);
 }
 
 const DEVICE_ONLY: CloudStatus = {
@@ -54,6 +78,9 @@ export class SyncEngine {
   private rerun = false;
   private fence = 0;
   private stopped = false;
+  private retryAttempt = 0;
+  private cancelRetry: (() => void) | null = null;
+  private relinks = 0;
 
   constructor(options: SyncEngineOptions) {
     this.options = options;
@@ -72,11 +99,14 @@ export class SyncEngine {
     this.stopped = true;
     this.fence += 1;
     this.rerun = false;
+    this.clearRetry();
   }
 
   invalidate(): void {
     this.fence += 1;
     this.rerun = false;
+    this.retryAttempt = 0;
+    this.clearRetry();
     this.emit(DEVICE_ONLY);
   }
 
@@ -90,6 +120,7 @@ export class SyncEngine {
       this.rerun = true;
       return this.running;
     }
+    this.clearRetry();
     const run = this.drain();
     const tracked = run.finally(() => {
       if (this.running === tracked) this.running = null;
@@ -100,6 +131,7 @@ export class SyncEngine {
 
   private async drain(): Promise<void> {
     let passes = 0;
+    this.relinks = 0;
     do {
       this.rerun = false;
       await this.syncOnce();
@@ -343,7 +375,35 @@ export class SyncEngine {
         this.queueNewerPayload(capturedFence, lineageId, generation, 'Saving newer changes…', savedAt);
       }
     } catch (error) {
-      if (this.fenceMatches(capturedFence, lineageId, generation)) this.handleError(error, this.options.getMeta());
+      if (!this.fenceMatches(capturedFence, lineageId, generation)) return;
+      if (isSessionLossError(error) && await this.relink(meta, capturedFence, lineageId, generation)) return;
+      this.handleError(error, this.options.getMeta());
+    }
+  }
+
+  /**
+   * A device whose anonymous sign-in was lost (cleared storage, revoked refresh token) keeps its
+   * own recovery code in local metadata. Claiming with it re-adds membership for the new sign-in,
+   * exactly as a parent restore would, so backups resume without anyone retyping the code.
+   * Returns true when the caller should not report the original error.
+   */
+  private async relink(meta: CloudLocalMeta, fence: number, lineageId: string, generation: string): Promise<boolean> {
+    const transport = this.options.transport;
+    const code = meta.recoveryCode;
+    if (!transport || !code || !meta.spaceId || this.relinks >= MAX_RELINKS_PER_DRAIN) return false;
+    this.relinks += 1;
+    try {
+      this.emit({ phase: 'connecting', message: 'Reconnecting cloud backup…', lastSavedAt: meta.lastSavedAt });
+      const result = await transport.claimSpace(code);
+      if (!this.fenceMatches(fence, lineageId, generation)) return true;
+      if (result.status === 'ok' && result.spaceId === meta.spaceId && result.generation === generation) {
+        this.rerun = true;
+        return true;
+      }
+      return false;
+    } catch (error) {
+      if (this.fenceMatches(fence, lineageId, generation)) this.handleError(error, this.options.getMeta());
+      return true;
     }
   }
 
@@ -464,13 +524,45 @@ export class SyncEngine {
   }
 
   private emit(status: CloudStatus): void {
-    if (!this.stopped) this.options.onStatus(status);
+    if (this.stopped) return;
+    this.options.onStatus(status);
+    if (status.phase === 'saved') {
+      this.retryAttempt = 0;
+      this.clearRetry();
+    } else if (status.phase === 'error' || status.phase === 'setup-needed') {
+      const delay = status.phase === 'setup-needed'
+        ? SETUP_RETRY_MS
+        : RETRY_DELAYS_MS[Math.min(this.retryAttempt, RETRY_DELAYS_MS.length - 1)];
+      this.retryAttempt += 1;
+      this.scheduleRetry(delay);
+    }
+  }
+
+  /** Failed saves retry on their own with backoff; any new request cancels the pending timer. */
+  private scheduleRetry(delayMs: number): void {
+    if (this.stopped || !this.options.transport) return;
+    this.clearRetry();
+    const schedule = this.options.scheduleRetry ?? defaultScheduleRetry;
+    this.cancelRetry = schedule(() => {
+      this.cancelRetry = null;
+      void this.requestSync();
+    }, delayMs);
+  }
+
+  private clearRetry(): void {
+    const cancel = this.cancelRetry;
+    this.cancelRetry = null;
+    cancel?.();
   }
 
   private handleError(error: unknown, meta: CloudLocalMeta | null): void {
     console.warn('cloud sync failed; local state retained', error);
     if (!this.options.isOnline()) {
       this.emit({ phase: 'offline', message: 'Offline · cloud not updated', lastSavedAt: meta?.lastSavedAt ?? null });
+      return;
+    }
+    if (isAnonymousDisabledError(error)) {
+      this.emit({ phase: 'setup-needed', message: 'Cloud backup needs anonymous sign-ins turned on', lastSavedAt: meta?.lastSavedAt ?? null });
       return;
     }
     this.emit({

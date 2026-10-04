@@ -1,70 +1,67 @@
+import { Minus, TrendingDown, TrendingUp } from 'lucide-react';
 import type { Entry } from '../../types';
 import { DIMENSIONS, DIMENSION_ORDER } from '../../data/dimensionTheme';
+import { toneVars } from '../../data/tones';
 import { dimensionSeries, trendOf } from '../../services/writerMemory';
 
 interface Props {
   entries: Entry[];
   /** How many recent pieces to chart. */
   window?: number;
+  /** Stacked rows for narrow columns. */
+  compact?: boolean;
 }
 
-const W = 88;
-const H = 26;
+const W = 100;
+const H = 30;
 
-function path(series: number[]): string {
+function yFor(value: number): number {
+  return H - (Math.max(0, Math.min(10, value)) / 10) * (H - 6) - 3;
+}
+
+function linePath(series: number[]): string {
   if (series.length === 0) return '';
-  if (series.length === 1) return `M0,${H / 2} L${W},${H / 2}`;
-  const max = 10;
+  if (series.length === 1) return `M0,${yFor(series[0]).toFixed(1)} L${W},${yFor(series[0]).toFixed(1)}`;
   const step = W / (series.length - 1);
-  return series
-    .map((v, i) => {
-      const x = i * step;
-      const y = H - (Math.max(0, Math.min(max, v)) / max) * (H - 4) - 2;
-      return `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`;
-    })
-    .join(' ');
+  return series.map((value, index) => `${index === 0 ? 'M' : 'L'}${(index * step).toFixed(1)},${yFor(value).toFixed(1)}`).join(' ');
 }
 
-const TREND_LABEL: Record<ReturnType<typeof trendOf>, string> = {
-  climbing: 'climbing',
-  steady: 'steady',
-  dipping: 'dipping',
-};
+const TREND = {
+  climbing: { label: 'Climbing', Icon: TrendingUp },
+  steady: { label: 'Steady', Icon: Minus },
+  dipping: { label: 'Dipping', Icon: TrendingDown },
+} as const;
 
-/** Five small trend lines — one per grading dimension — over recent pieces. */
-export function DimensionSparklines({ entries, window = 8 }: Props) {
+/** Five trend lines, one per grading dimension, over recent pieces. */
+export function DimensionSparklines({ entries, window = 8, compact = false }: Props) {
   const series = dimensionSeries(entries, window);
   if (DIMENSION_ORDER.every((dimension) => series[dimension].length === 0)) {
-    return <p className="text-caption text-text-faint">Skill trends need graded writing. Recovered pieces with unavailable grades are still kept in Journal.</p>;
+    return <p className="ws-small">Skill trends need graded writing. Recovered pieces with unavailable grades are still kept in Journal.</p>;
   }
 
   return (
-    <div className="space-y-2">
-      {DIMENSION_ORDER.map((d) => {
-        const theme = DIMENSIONS[d];
+    <div className={`ws-skill-rows ${compact ? 'is-compact' : ''}`}>
+      {DIMENSION_ORDER.map((dimension) => {
+        const theme = DIMENSIONS[dimension];
         const Glyph = theme.Glyph;
-        const data = series[d];
+        const data = series[dimension];
         const latest = data.length ? data[data.length - 1] : null;
-        const trend = trendOf(data);
+        const trend = TREND[trendOf(data)];
+        const line = linePath(data);
         return (
-          <div key={d} className="flex items-center gap-3">
-            <span className="flex items-center gap-1.5 w-28 shrink-0">
-              <Glyph size={13} style={{ color: theme.color }} />
-              <span className="text-caption text-text-muted truncate">{theme.label}</span>
+          <div key={dimension} className="ws-skill-row" style={toneVars(dimension)}>
+            <span className="ws-skill-name"><Glyph size={16} aria-hidden="true" /><span>{theme.kidLabel}</span></span>
+            <span className="ws-skill-spark" aria-hidden="true">
+              <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
+                {line && <path d={`${line} L${W},${H} L0,${H} Z`} fill={theme.color} fillOpacity={0.12} />}
+                {line && <path d={line} fill="none" stroke={theme.color} strokeWidth={2.4} strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />}
+              </svg>
+              {latest !== null && <i className="ws-skill-dot" style={{ top: `${((yFor(latest) / H) * 100).toFixed(1)}%`, background: theme.color }} />}
             </span>
-            <svg viewBox={`0 0 ${W} ${H}`} width={W} height={H} className="shrink-0" aria-hidden>
-              <path d={path(data)} fill="none" stroke={theme.color} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
-              {latest !== null && (
-                <circle
-                  cx={W}
-                  cy={H - (Math.max(0, Math.min(10, latest)) / 10) * (H - 4) - 2}
-                  r={2.5}
-                  fill={theme.color}
-                />
-              )}
-            </svg>
-            <span className="font-mono text-caption text-text tabular-nums w-6 text-right">{latest ?? '—'}</span>
-            <span className="text-micro uppercase tracking-wide text-text-faint w-16 hidden sm:inline">{latest === null ? 'no grades' : TREND_LABEL[trend]}</span>
+            <span className="ws-skill-value" aria-label={`${theme.label} latest score`}>{latest ?? '—'}</span>
+            <span className={`ws-skill-trend is-${trendOf(data)}`}>
+              {latest === null ? 'No grades' : <><trend.Icon size={14} aria-hidden="true" /> {trend.label}</>}
+            </span>
           </div>
         );
       })}

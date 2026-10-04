@@ -1,6 +1,6 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react';
 
-type Variant = 'primary' | 'ghost' | 'subtle' | 'danger' | 'gold';
+type Variant = 'primary' | 'gold' | 'night' | 'ghost' | 'ghost-light' | 'subtle' | 'danger' | 'danger-ghost';
 type Size = 'sm' | 'md' | 'lg';
 
 interface Props extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -10,28 +10,29 @@ interface Props extends ButtonHTMLAttributes<HTMLButtonElement> {
   fullWidth?: boolean;
 }
 
-const base =
-  'inline-flex items-center justify-center gap-2 rounded-xl font-sans font-semibold transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed touch-manipulation focus:outline-none focus-visible:ring-2 focus-visible:ring-gold/60 active:scale-[0.98]';
-
-const variants: Record<Variant, string> = {
-  primary: 'bg-gold text-ink hover:bg-gold-bright shadow-gold-glow',
-  gold: 'bg-gradient-to-br from-gold-bright via-gold to-gold-deep text-ink hover:brightness-110 shadow-gold-glow',
-  ghost: 'bg-transparent text-text border border-line-2 hover:bg-surface-2 hover:border-text-muted',
-  subtle: 'bg-surface text-text border border-line hover:bg-surface-2',
-  danger: 'bg-rust text-paper hover:bg-rust/90',
+const VARIANT_CLASS: Record<Variant, string> = {
+  primary: 'ws-btn--gold',
+  gold: 'ws-btn--gold',
+  night: 'ws-btn--night',
+  ghost: 'ws-btn--ghost',
+  'ghost-light': 'ws-btn--ghost-light',
+  subtle: 'ws-btn--subtle',
+  danger: 'ws-btn--danger',
+  'danger-ghost': 'ws-btn--danger-ghost',
 };
 
-const sizes: Record<Size, string> = {
-  sm: 'px-3 py-2 text-caption min-h-[44px]',
-  md: 'px-5 py-3 text-body min-h-[48px]',
-  lg: 'px-6 py-4 text-body min-h-[56px]',
+const SIZE_CLASS: Record<Size, string> = {
+  sm: 'ws-btn--sm',
+  md: '',
+  lg: 'ws-btn--lg',
 };
 
-export function Button({ variant = 'primary', size = 'md', fullWidth, children, className = '', ...rest }: Props) {
+export function Button({ variant = 'gold', size = 'md', fullWidth, children, className = '', type = 'button', ...rest }: Props) {
   return (
     <button
+      type={type}
       {...rest}
-      className={`${base} ${variants[variant]} ${sizes[size]} ${fullWidth ? 'w-full' : ''} ${className}`}
+      className={['ws-btn', VARIANT_CLASS[variant], SIZE_CLASS[size], fullWidth ? 'ws-btn--block' : '', className].filter(Boolean).join(' ')}
     >
       {children}
     </button>

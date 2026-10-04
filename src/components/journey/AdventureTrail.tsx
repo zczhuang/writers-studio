@@ -1,30 +1,26 @@
-import { BookOpen, Check, Feather, LockKeyhole, PenTool, Quote, Wand } from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
+import type { CSSProperties } from 'react';
+import { Check, Feather, LockKeyhole, Map } from 'lucide-react';
 import { LEVELS } from '../../data/levels';
 import { rankSnapshot } from '../../utils/progression';
-
-const LEVEL_ICONS: Record<string, LucideIcon> = {
-  Feather,
-  Quote,
-  Wand,
-  BookOpen,
-  PenTool,
-};
+import { LEVEL_ICONS } from './levelIcons';
+import { toneVars } from '../../data/tones';
 
 export function AdventureTrail({ xp }: { xp: number }) {
   const rank = rankSnapshot(xp);
   const currentIndex = LEVELS.findIndex((level) => level.id === rank.level.id);
 
   return (
-    <section className="atlas-trail-section" aria-labelledby="adventure-trail-title">
-      <div className="atlas-section-heading">
+    <section className="ws-card ws-card-pad ws-trail-card" aria-labelledby="adventure-trail-title">
+      <div className="ws-section-head">
         <div>
-          <p className="atlas-kicker">The route so far</p>
-          <h2 id="adventure-trail-title" className="atlas-heading atlas-heading-small">Adventure trail</h2>
+          <p className="ws-kicker"><Map size={14} aria-hidden="true" /> The route so far</p>
+          <h2 id="adventure-trail-title" className="ws-h2">Adventure trail</h2>
         </div>
-        <span className="atlas-caption">{rank.level.name} rank</span>
+        <span className="ws-chip tabular" style={toneVars('gold')}>
+          {xp.toLocaleString()} XP
+        </span>
       </div>
-      <ol className="atlas-trail" aria-label="Writing rank progression">
+      <ol className="ws-trail" aria-label="Writing rank progression">
         {LEVELS.map((level, index) => {
           const Icon = LEVEL_ICONS[level.icon] ?? Feather;
           const completed = index < currentIndex;
@@ -36,25 +32,25 @@ export function AdventureTrail({ xp }: { xp: number }) {
           return (
             <li
               key={level.id}
-              className={`atlas-trail-stop ${completed ? 'is-complete' : ''} ${current ? 'is-current' : ''} ${locked ? 'is-locked' : ''}`}
+              className={`ws-trail-stop ${completed ? 'is-complete' : ''} ${current ? 'is-current' : ''} ${locked ? 'is-locked' : ''}`}
               aria-current={current ? 'step' : undefined}
               aria-label={`${level.name}, ${stateLabel}${unlockLabel}`}
+              style={current ? ({ '--pct': Math.round(rank.pct) } as CSSProperties) : undefined}
             >
-              <div className="atlas-trail-node-wrap">
-                <span className="atlas-trail-node" aria-hidden="true">
-                  {completed ? <Check size={14} strokeWidth={2.5} /> : locked ? <LockKeyhole size={13} /> : <Icon size={15} />}
-                </span>
+              <div className="ws-trail-node-wrap">
                 {index < LEVELS.length - 1 && (
-                  <span className="atlas-trail-connector" aria-hidden="true">
+                  <span className="ws-trail-road" aria-hidden="true">
                     <span style={{ width: `${fill}%` }} />
                   </span>
                 )}
+                <span className="ws-trail-node" aria-hidden="true">
+                  {completed ? <Check size={20} strokeWidth={2.6} /> : locked ? <LockKeyhole size={16} /> : <Icon size={19} />}
+                </span>
               </div>
-              <span className="atlas-trail-label">{level.name}</span>
-              <span className="atlas-trail-xp">
-                {locked ? `${level.min.toLocaleString()} XP to unlock` : current ? `${Math.round(rank.pct)}% through` : 'Complete'}
+              <span className="ws-trail-name">{level.name}</span>
+              <span className="ws-trail-meta">
+                {locked ? `${level.min.toLocaleString()} XP` : current ? `${Math.round(rank.pct)}% there` : 'Complete'}
               </span>
-              <span className="sr-only">{stateLabel}{unlockLabel}.</span>
             </li>
           );
         })}

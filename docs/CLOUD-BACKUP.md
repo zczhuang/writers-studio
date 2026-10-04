@@ -22,6 +22,17 @@ Writer's Studio is offline-first. Local saves remain authoritative while offline
 
 If the environment variables are absent, the app remains fully usable and does not attempt auth or database calls. The device badge reports the verified local-storage result; quota, recovery-checkpoint, damaged-save, and update-required states are shown as unsaved/actionable instead of claiming success.
 
+## Provisioning status
+
+Production cloud backup has been live since 2026-10-04 on the owner-approved shared project described in [Production activation, 2026-10-04](#production-activation-2026-10-04). A build without the two `VITE_SUPABASE_*` values, such as local development without a `.env`, runs device-only, and the Parent dashboard and Settings say "Cloud backup is not connected". If anonymous sign-ins are ever turned off, the app shows "Cloud backup needs one setup step" instead of a generic error.
+
+## Reliability
+
+- **Automatic retries.** A failed save retries after 4 s, 15 s, 45 s, 2 min, then every 5 min. Any edit, reconnect, or tab focus retries sooner. A successful save resets the backoff.
+- **Flush on hide.** Hiding or closing the tab (`visibilitychange`, `pagehide`) starts a save immediately instead of waiting for the 650 ms edit debounce. Returning to the tab pulls and merges changes from other devices.
+- **Self-healing sign-in.** If the anonymous session is lost (cleared storage, revoked or reused refresh token, or the server no longer lists the device as a member), the engine claims its own space with the recovery code already stored in device metadata, then retries. The claim must return the same space and generation or nothing is applied. Pull and sync calls still never mint an identity on their own.
+- **Setup errors are named.** `anonymous_provider_disabled` maps to a `setup-needed` status that rechecks every 5 minutes.
+
 ## Data and security model
 
 The migration is additive and creates these membership-scoped, read-only API tables:
@@ -93,7 +104,7 @@ The code is 43 URL-safe characters representing 32 random bytes (256 bits). It i
 
 1. Open Writer's Studio and pass the normal app access screen.
 2. On a fresh browser, complete the local parent-PIN setup. The PIN protects settings on that device; it is not sent to Supabase.
-3. Unlock Parent mode, open Settings, and paste the code into **Restore with a recovery code**.
+3. Unlock Parent mode (the **Parent** button in the top bar, or **Parent area** in the sidebar on wide screens; both work with nothing to pay out), open Settings, and paste the code into **Restore with a recovery code**.
 4. Choose **Restore & link this device**.
 
 The server rate-limits failed claims. A successful claim pulls and merges the current cloud state. A wrong code, expired parent-access window, sign-in error, or network failure never clears local progress.

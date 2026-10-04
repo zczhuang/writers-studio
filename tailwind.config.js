@@ -4,6 +4,13 @@ export default {
   theme: {
     extend: {
       colors: {
+        night: {
+          950: 'var(--night-950)',
+          900: 'var(--night-900)',
+          800: 'var(--night-800)',
+          700: 'var(--night-700)',
+          600: 'var(--night-600)',
+        },
         bg: 'var(--bg)',
         surface: 'var(--surface)',
         'surface-2': 'var(--surface-2)',
@@ -31,45 +38,40 @@ export default {
         },
       },
       fontFamily: {
-        serif: ['"Lora"', 'Georgia', 'serif'],
-        display: ['"Crimson Pro"', '"Lora"', 'Georgia', 'serif'],
-        sans: ['Inter', 'system-ui', 'sans-serif'],
-        mono: ['"JetBrains Mono"', 'ui-monospace', 'monospace'],
+        serif: ['"Literata Variable"', 'Georgia', 'serif'],
+        display: ['"Fraunces Variable"', 'Georgia', 'serif'],
+        sans: ['"Figtree Variable"', 'system-ui', '-apple-system', 'sans-serif'],
+        mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
       },
       fontSize: {
-        display: ['clamp(2rem, 1.5rem + 2vw, 3.2rem)', { lineHeight: '1.1', letterSpacing: '-0.02em' }],
-        h1: ['clamp(1.6rem, 1.3rem + 1.2vw, 2.2rem)', { lineHeight: '1.2' }],
-        h2: ['clamp(1.25rem, 1.1rem + 0.6vw, 1.5rem)', { lineHeight: '1.3' }],
-        h3: ['1.125rem', { lineHeight: '1.4' }],
+        display: ['clamp(2rem, 1.5rem + 2vw, 3.2rem)', { lineHeight: '1.05', letterSpacing: '-0.02em' }],
+        h1: ['clamp(1.75rem, 1.35rem + 1.4vw, 2.5rem)', { lineHeight: '1.1', letterSpacing: '-0.015em' }],
+        h2: ['clamp(1.3rem, 1.12rem + 0.7vw, 1.65rem)', { lineHeight: '1.2' }],
+        h3: ['1.15rem', { lineHeight: '1.35' }],
         body: ['1rem', { lineHeight: '1.6' }],
-        caption: ['0.8125rem', { lineHeight: '1.4' }],
-        micro: ['0.6875rem', { lineHeight: '1.3', letterSpacing: '0.06em' }],
-        write: ['1.125rem', { lineHeight: '1.75' }],
+        caption: ['0.875rem', { lineHeight: '1.45' }],
+        micro: ['0.75rem', { lineHeight: '1.35', letterSpacing: '0.02em' }],
+        write: ['1.1875rem', { lineHeight: '2rem' }],
       },
       boxShadow: {
         card: 'var(--shadow-card)',
         paper: 'var(--shadow-paper)',
-        'gold-glow': '0 6px 20px rgba(192,135,31,0.28)',
+        lift: 'var(--shadow-lift)',
+        'gold-glow': '0 10px 24px -8px rgba(222, 159, 44, 0.6)',
       },
       animation: {
-        'tier-shimmer': 'shimmer 1.8s ease-out',
-        'fade-in': 'fade-in 0.4s ease-out',
-        'slide-up': 'slide-up 0.5s cubic-bezier(0.2, 0.8, 0.2, 1)',
+        'fade-in': 'fade-in 0.4s ease-out both',
+        'slide-up': 'slide-up 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) both',
         'pulse-soft': 'pulse-soft 2.4s ease-in-out infinite',
-        'shake': 'shake 0.45s cubic-bezier(.36,.07,.19,.97) both',
+        shake: 'shake 0.45s cubic-bezier(.36,.07,.19,.97) both',
       },
       keyframes: {
-        shimmer: {
-          '0%': { transform: 'translateX(-110%)', opacity: '0' },
-          '30%': { opacity: '1' },
-          '100%': { transform: 'translateX(110%)', opacity: '0' },
-        },
         'fade-in': {
           '0%': { opacity: '0' },
           '100%': { opacity: '1' },
         },
         'slide-up': {
-          '0%': { opacity: '0', transform: 'translateY(16px)' },
+          '0%': { opacity: '0', transform: 'translateY(14px)' },
           '100%': { opacity: '1', transform: 'translateY(0)' },
         },
         'pulse-soft': {

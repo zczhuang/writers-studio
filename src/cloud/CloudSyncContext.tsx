@@ -73,10 +73,17 @@ export function CloudSyncProvider({ children }: { children: ReactNode }) {
     engineRef.current = engine;
     engine.start();
     const retry = () => void engine.requestSync();
+    // Hiding or closing the tab flushes right away instead of waiting for the edit debounce
+    // (kids often close an iPad tab seconds after finishing); coming back pulls other devices' changes.
+    const onVisibility = () => void engine.requestSync();
     window.addEventListener('online', retry);
+    window.addEventListener('pagehide', retry);
+    document.addEventListener('visibilitychange', onVisibility);
     const unsubscribeAuth = transport?.onAuthChange(retry);
     return () => {
       window.removeEventListener('online', retry);
+      window.removeEventListener('pagehide', retry);
+      document.removeEventListener('visibilitychange', onVisibility);
       unsubscribeAuth?.();
       engine.stop();
       if (engineRef.current === engine) engineRef.current = null;

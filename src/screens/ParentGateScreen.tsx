@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { ShieldCheck, AlertTriangle } from 'lucide-react';
+import { AlertTriangle, ShieldCheck } from 'lucide-react';
 import { useApp } from '../state/AppContext';
 import { PinPad } from '../components/ui/PinPad';
 import { verifyPin } from '../services/pinHash';
 import { Button } from '../components/ui/Button';
+import { toneVars } from '../data/tones';
 import {
   browserDeadlineRuntime,
   parentAccessIsActive,
@@ -68,37 +69,37 @@ export function ParentGateScreen() {
         setError('Too many wrong PINs. Wait 30s.');
         attempts.current = 0;
       } else {
-        setError(`Wrong PIN — ${3 - attempts.current} ${3 - attempts.current === 1 ? 'try' : 'tries'} left.`);
+        setError(`Wrong PIN. ${3 - attempts.current} ${3 - attempts.current === 1 ? 'try' : 'tries'} left.`);
       }
     }
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-[80vh] px-4 animate-slide-up">
-      <div className="bg-gold/15 text-gold rounded-full p-3 mb-3">
-        <ShieldCheck size={26} />
+    <div className="flex min-h-[72vh] items-center justify-center">
+      <div className="ws-card ws-card-pad ws-rise w-full max-w-[26rem] text-center">
+        <span className="ws-medallion ws-medallion--lg ws-medallion--solid mx-auto" style={toneVars('night')} aria-hidden="true">
+          <ShieldCheck size={26} />
+        </span>
+        <h1 className="ws-h2 mt-4">Parent PIN</h1>
+        <p className="ws-small mx-auto mt-2 mb-6 max-w-xs">Four digits unlock payouts, settings, and cloud backup for 10 minutes.</p>
+
+        {lockedRemainingSec > 0 && (
+          <div className="ws-callout ws-callout--warn mb-4 justify-center" role="status">
+            <AlertTriangle size={17} aria-hidden="true" />
+            <span>Locked for {lockedRemainingSec}s</span>
+          </div>
+        )}
+
+        <PinPad onSubmit={submit} shake={shake > 0 && shake % 2 === 1} />
+
+        <p className="ws-stage-error" role={error && lockedRemainingSec === 0 ? 'alert' : undefined}>
+          {lockedRemainingSec === 0 ? error : ''}
+        </p>
+
+        <Button variant="ghost" size="sm" onClick={() => dispatch({ type: 'NAV_BACK' })} className="mt-2">
+          Cancel
+        </Button>
       </div>
-      <h1 className="font-display text-h1 font-semibold text-text mb-1 text-center">Parent PIN</h1>
-      <p className="text-caption text-text-muted mb-6 text-center max-w-xs">
-        Four digits unlock payouts and settings.
-      </p>
-
-      {lockedRemainingSec > 0 ? (
-        <div className="bg-rust/15 text-text border border-rust/30 rounded-xl px-4 py-3 mb-3 flex items-center gap-2">
-          <AlertTriangle size={16} className="text-rust" />
-          <span>Locked for {lockedRemainingSec}s</span>
-        </div>
-      ) : null}
-
-      <PinPad onSubmit={submit} shake={shake > 0 && shake % 2 === 1 ? true : false} />
-
-      {error && lockedRemainingSec === 0 && (
-        <p className="mt-3 text-caption text-rust">{error}</p>
-      )}
-
-      <Button variant="ghost" onClick={() => dispatch({ type: 'NAV_BACK' })} className="mt-6" size="sm">
-        Cancel
-      </Button>
     </div>
   );
 }

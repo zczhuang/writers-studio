@@ -1,5 +1,7 @@
-import { ArrowUpRight, Check, Compass, PenLine, Sparkles } from 'lucide-react';
+import { ArrowUpRight, Check, Compass, PenLine, Sparkles, Target } from 'lucide-react';
 import type { DailyMission } from '../../utils/progression';
+import { toneVars, type ToneName } from '../../data/tones';
+import { ProgressRing } from '../art/ProgressRing';
 
 interface Props {
   missions: DailyMission[];
@@ -12,58 +14,73 @@ const MISSION_ICONS = {
   'mode-explorer': Compass,
 } as const;
 
+const MISSION_TONES: Record<DailyMission['id'], ToneName> = {
+  'finish-piece': 'story',
+  'word-sprint': 'mystery',
+  'mode-explorer': 'scene',
+};
+
 export function DailyMissionList({ missions, onAction }: Props) {
   const completeCount = missions.filter((mission) => mission.complete).length;
   const allComplete = completeCount === missions.length;
+  const pct = missions.length > 0 ? (completeCount / missions.length) * 100 : 0;
 
   return (
-    <section className="atlas-panel atlas-missions" aria-labelledby="daily-missions-title">
-      <div className="atlas-section-heading">
+    <section className="ws-card ws-card-pad" aria-labelledby="daily-missions-title">
+      <div className="ws-section-head">
         <div>
-          <p className="atlas-kicker">Small steps, real pages</p>
-          <h2 id="daily-missions-title" className="atlas-heading atlas-heading-small">Today’s missions</h2>
+          <p className="ws-kicker"><Target size={14} aria-hidden="true" /> Small steps, real pages</p>
+          <h2 id="daily-missions-title" className="ws-h2">Today&apos;s missions</h2>
         </div>
-        <span className="atlas-mission-count" aria-label={`${completeCount} of ${missions.length} missions complete`}>
-          {completeCount}/{missions.length}
-        </span>
+        <ProgressRing pct={pct} size={52} stroke={5} label={`${completeCount} of ${missions.length} missions complete`} style={toneVars('success')}>
+          <span className="text-[0.82rem] font-extrabold tabular-nums text-ink">{completeCount}/{missions.length}</span>
+        </ProgressRing>
       </div>
 
       {allComplete ? (
-        <div className="atlas-mission-celebration">
-          <span className="atlas-celebration-mark" aria-hidden="true"><Sparkles size={18} /></span>
+        <div className="ws-mission-done">
+          <span className="ws-medallion ws-medallion--lg ws-medallion--solid" style={toneVars('gold')} aria-hidden="true"><Sparkles size={24} /></span>
           <div>
-            <strong>All three are complete.</strong>
-            <p>Your atlas has a fresh set of marks today.</p>
+            <strong>All three missions complete!</strong>
+            <p>Your atlas has a fresh set of marks today. Anything else you write is a bonus.</p>
           </div>
         </div>
       ) : (
-        <div className="atlas-mission-list">
+        <ul className="ws-missions">
           {missions.map((mission) => {
             const Icon = MISSION_ICONS[mission.id];
             const width = mission.target > 0 ? Math.max(0, Math.min(100, (mission.progress / mission.target) * 100)) : 0;
             return (
-              <div className={`atlas-mission ${mission.complete ? 'is-complete' : ''}`} key={mission.id}>
-                <span className="atlas-mission-icon" aria-hidden="true">
-                  {mission.complete ? <Check size={16} /> : <Icon size={16} />}
+              <li className={`ws-mission ${mission.complete ? 'is-complete' : ''}`} key={mission.id} style={toneVars(MISSION_TONES[mission.id])}>
+                <span className="ws-mission-check" aria-hidden="true">
+                  {mission.complete ? <Check size={18} strokeWidth={2.6} /> : <Icon size={18} />}
                 </span>
-                <div className="atlas-mission-copy">
-                  <div className="atlas-mission-title-row">
+                <div className="ws-mission-body">
+                  <div className="ws-mission-row">
                     <strong>{mission.title}</strong>
                     <span>{mission.complete ? 'Done' : mission.detail}</span>
                   </div>
-                  <div className="atlas-mini-track" role="progressbar" aria-label={`${mission.title} progress`} aria-valuemin={0} aria-valuemax={mission.target} aria-valuenow={Math.min(mission.target, mission.progress)}>
+                  <div
+                    className="ws-progress ws-progress--thin"
+                    style={mission.complete ? toneVars('success') : undefined}
+                    role="progressbar"
+                    aria-label={`${mission.title} progress`}
+                    aria-valuemin={0}
+                    aria-valuemax={mission.target}
+                    aria-valuenow={Math.min(mission.target, mission.progress)}
+                  >
                     <span style={{ width: `${width}%` }} />
                   </div>
                 </div>
                 {!mission.complete && onAction && (
-                  <button className="atlas-text-button" onClick={() => onAction(mission)}>
-                    {mission.actionLabel} <ArrowUpRight size={14} aria-hidden="true" />
+                  <button type="button" className="ws-link-btn" onClick={() => onAction(mission)}>
+                    {mission.actionLabel} <ArrowUpRight size={15} aria-hidden="true" />
                   </button>
                 )}
-              </div>
+              </li>
             );
           })}
-        </div>
+        </ul>
       )}
     </section>
   );

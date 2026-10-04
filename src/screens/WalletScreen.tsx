@@ -1,20 +1,16 @@
-import { useEffect, useState } from 'react';
-import { Coins, Lock } from 'lucide-react';
+import { useEffect, useState, type CSSProperties } from 'react';
+import { Check, Coins, Lock, Receipt } from 'lucide-react';
 import { useApp } from '../state/AppContext';
 import { useDailyCap } from '../hooks/useDailyCap';
 import { ProgressBar } from '../components/ui/ProgressBar';
 import { Button } from '../components/ui/Button';
+import { TierChip } from '../components/TierChip';
+import { StarField } from '../components/art/StarField';
+import { TreasureArt } from '../components/art/TreasureArt';
+import { MODE_THEME } from '../data/modeTheme';
+import { toneVars } from '../data/tones';
 import { prettyDate } from '../utils/date';
-import type { Tier } from '../types';
 import { tierLabel } from '../services/scoring';
-
-const TIER_CLASS: Record<Tier, string> = {
-  none: 'text-text-faint',
-  bronze: 'text-tier-bronze',
-  silver: 'text-tier-silver',
-  gold: 'text-tier-gold',
-  platinum: 'text-tier-platinum',
-};
 
 function parentAccessIsActive(until: number): boolean {
   return until > Date.now();
@@ -73,101 +69,117 @@ export function WalletScreen() {
   };
 
   return (
-    <div className="space-y-5 animate-slide-up">
-      <header>
-        <h1 className="font-display text-h1 font-semibold text-text">Wallet</h1>
-        <p className="text-text-muted text-caption mt-1">Your earnings, ready for payout.</p>
-      </header>
-
-      <section className="bg-surface border border-line rounded-2xl p-6">
-        <div className="text-micro text-text-faint uppercase tracking-wider font-semibold mb-1">Pending</div>
-        <div className="font-mono text-display font-semibold text-gold tabular-nums leading-none">
-          ${state.earnings.lifetimePending.toFixed(2)}
-        </div>
-        <div className="mt-4 flex justify-between text-caption text-text-muted">
-          <div>
-            <div className="text-micro text-text-faint uppercase tracking-wider">Paid</div>
-            <div className="font-mono text-h3 font-semibold text-text tabular-nums">${state.earnings.lifetimePaid.toFixed(2)}</div>
+    <div className="ws-page">
+      <section className="ws-wallet-hero ws-night ws-rise" aria-labelledby="wallet-title">
+        <StarField seed={9} count={36} sparkles={4} />
+        <div className="min-w-0">
+          <h1 id="wallet-title" className="ws-wallet-label">Waiting for payout</h1>
+          <div className="ws-wallet-amount">${state.earnings.lifetimePending.toFixed(2)}</div>
+          <div className="ws-wallet-split">
+            <div><span>Paid so far</span><strong>${state.earnings.lifetimePaid.toFixed(2)}</strong></div>
+            <div><span>Lifetime earned</span><strong>${(state.earnings.lifetimePaid + state.earnings.lifetimePending).toFixed(2)}</strong></div>
           </div>
-          <div className="text-right">
-            <div className="text-micro text-text-faint uppercase tracking-wider">Lifetime</div>
-            <div className="font-mono text-h3 font-semibold text-text tabular-nums">
-              ${(state.earnings.lifetimePaid + state.earnings.lifetimePending).toFixed(2)}
+          <div className="mt-6 max-w-md">
+            <div className="mb-2 flex justify-between text-[0.85rem] font-semibold text-[var(--night-muted)]">
+              <span>Today&apos;s earnings</span>
+              <span className="tabular text-white">${cap.earnedToday.toFixed(2)} of ${cap.cap.toFixed(2)}</span>
             </div>
+            <ProgressBar pct={cap.pct} tone={cap.capHit ? 'danger' : 'gold'} label="Today's earnings toward the daily cap" />
+            <p className="ws-small mt-2 mb-0">{cap.capHit ? 'Today’s cap is reached. New pieces still count for practice.' : `$${cap.remaining.toFixed(2)} left to earn today.`}</p>
           </div>
         </div>
+        <TreasureArt className="ws-wallet-art ws-float" />
       </section>
 
-      <section className="bg-surface border border-line rounded-xl p-4">
-        <div className="flex items-center justify-between text-caption mb-2">
-          <span className="text-text-muted">Today's progress</span>
-          <span className="font-mono tabular-nums text-text">${cap.earnedToday.toFixed(2)} / ${cap.cap.toFixed(2)}</span>
-        </div>
-        <ProgressBar pct={cap.pct} variant={cap.capHit ? 'rust' : 'gold'} />
-      </section>
-
-      {!selecting ? (
-        <Button
-          variant={pending.length > 0 ? 'gold' : 'ghost'}
-          fullWidth
-          disabled={pending.length === 0}
-          onClick={startPayout}
-        >
-          {isParent ? <Coins size={18} /> : <Lock size={16} />}
-          {pending.length === 0
-            ? 'Nothing to pay out yet'
-            : isParent
-              ? `Pay out $${state.earnings.lifetimePending.toFixed(2)}`
-              : 'Parent: pay out'}
-        </Button>
-      ) : (
-        <div className="flex gap-2">
-          <Button variant="ghost" onClick={() => { setSelecting(false); setSelected(new Set()); }} className="flex-1">
-            Cancel
+      <div className="ws-rise" style={{ '--i': 1 } as CSSProperties}>
+        {!selecting ? (
+          <Button
+            variant={pending.length > 0 ? 'gold' : 'ghost'}
+            size="lg"
+            fullWidth
+            disabled={pending.length === 0}
+            onClick={startPayout}
+          >
+            {isParent ? <Coins size={19} aria-hidden="true" /> : <Lock size={17} aria-hidden="true" />}
+            {pending.length === 0
+              ? 'Nothing to pay out yet'
+              : isParent
+                ? `Pay out $${state.earnings.lifetimePending.toFixed(2)}`
+                : 'Parent: pay out'}
           </Button>
-          <Button variant="gold" onClick={confirmPayout} disabled={selected.size === 0} className="flex-[2]">
-            Pay ${selectableTotal.toFixed(2)} ({selected.size})
-          </Button>
-        </div>
-      )}
-
-      <section>
-        <h2 className="font-display text-h2 font-semibold text-text mb-3">History</h2>
-        {ledger.length === 0 ? (
-          <p className="text-caption text-text-muted py-8 text-center">No earnings yet — write your first piece.</p>
         ) : (
-          <div className="space-y-2">
+          <div className="ws-write-actions">
+            <Button variant="ghost" onClick={() => { setSelecting(false); setSelected(new Set()); }}>
+              Cancel
+            </Button>
+            <Button variant="gold" onClick={confirmPayout} disabled={selected.size === 0}>
+              <Check size={18} aria-hidden="true" /> Pay ${selectableTotal.toFixed(2)} ({selected.size})
+            </Button>
+          </div>
+        )}
+      </div>
+
+      <section className="ws-rise" style={{ '--i': 2 } as CSSProperties} aria-labelledby="history-title">
+        <div className="ws-section-head">
+          <div>
+            <p className="ws-kicker"><Receipt size={14} aria-hidden="true" /> Every reward, recorded</p>
+            <h2 id="history-title" className="ws-h2">History</h2>
+          </div>
+          {selecting && <span className="ws-small">Choose the rewards you&apos;re paying now</span>}
+        </div>
+        {ledger.length === 0 ? (
+          <div className="ws-empty">
+            <Coins size={32} aria-hidden="true" />
+            <h3 className="ws-h3">No earnings yet</h3>
+            <p>Write your first piece. Bronze and above earn a reward, within the daily cap.</p>
+          </div>
+        ) : (
+          <ul className="ws-ledger">
             {ledger.map((l) => {
               const entry = state.entries.find((e) => e.id === l.entryId);
+              const selectable = selecting && l.status === 'pending';
               const isSelected = selected.has(l.id);
+              const theme = entry ? MODE_THEME[entry.mode] : null;
+              const content = (
+                <>
+                  {selectable ? (
+                    <span className="ws-checkbox" aria-hidden="true"><Check size={14} strokeWidth={3} /></span>
+                  ) : (
+                    <span className="ws-medallion ws-medallion--sm" style={toneVars(entry?.mode ?? 'neutral')} aria-hidden="true">
+                      {theme ? <theme.Icon size={16} /> : <Coins size={16} />}
+                    </span>
+                  )}
+                  <span className="min-w-0">
+                    <span className="ws-ledger-title block">{entry?.challengeTitle ?? 'Entry'}</span>
+                    <span className="ws-ledger-meta">
+                      <TierChip tier={l.tier} label={tierLabel(l.tier)} />
+                      <span>{prettyDate(l.createdAt)}</span>
+                    </span>
+                  </span>
+                  <span className="ws-ledger-amount">
+                    <strong>+${l.amount.toFixed(2)}</strong>
+                    <span className={`ws-status is-${l.status}`}>{l.status}</span>
+                  </span>
+                </>
+              );
               return (
-                <div
-                  key={l.id}
-                  onClick={() => selecting && l.status === 'pending' && toggle(l.id)}
-                  className={`bg-surface border rounded-xl p-3 flex items-center justify-between gap-3 transition-colors ${
-                    selecting && l.status === 'pending' ? 'cursor-pointer' : ''
-                  } ${isSelected ? 'border-gold/60 bg-gold/5' : 'border-line'}`}
-                >
-                  <div className="min-w-0 flex-1">
-                    <div className="text-caption text-text-muted truncate">{entry?.challengeTitle ?? 'Entry'}</div>
-                    <div className="flex items-center gap-2 text-micro mt-0.5">
-                      <span className={`uppercase tracking-wider font-semibold ${TIER_CLASS[l.tier]}`}>{tierLabel(l.tier)}</span>
-                      <span className="text-text-faint">·</span>
-                      <span className="text-text-faint">{prettyDate(l.createdAt)}</span>
-                    </div>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <div className="font-mono text-body font-semibold text-text tabular-nums">+${l.amount.toFixed(2)}</div>
-                    <div className={`text-micro font-medium uppercase tracking-wider ${
-                      l.status === 'paid' ? 'text-moss' : l.status === 'forfeited' ? 'text-text-faint' : 'text-gold'
-                    }`}>
-                      {l.status}
-                    </div>
-                  </div>
-                </div>
+                <li key={l.id}>
+                  {selectable ? (
+                    <button
+                      type="button"
+                      onClick={() => toggle(l.id)}
+                      aria-pressed={isSelected}
+                      className={`ws-ledger-row is-selectable ${isSelected ? 'is-selected' : ''}`}
+                    >
+                      {content}
+                    </button>
+                  ) : (
+                    <div className="ws-ledger-row">{content}</div>
+                  )}
+                </li>
               );
             })}
-          </div>
+          </ul>
         )}
       </section>
     </div>

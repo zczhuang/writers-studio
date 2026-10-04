@@ -116,4 +116,4 @@ follow the weakest dimension, growth feedback reflects actual improvement, and t
 radar, score bars, and craft library render across mobile and desktop. Revision checks
 must preserve paid rows and apply daily caps to every positive earnings delta.
 
-Current release details are in [the October 2026 release notes](RELEASE-2026-10-03.md).
+Release details: [October 3, 2026](RELEASE-2026-10-03.md) (story atlas, missions, cloud history) and [October 4, 2026](RELEASE-2026-10-04.md) (visual redesign, sync reliability).

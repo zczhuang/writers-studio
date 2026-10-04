@@ -1,4 +1,4 @@
-import { AlertCircle, Check, Cloud, CloudOff, Loader2 } from 'lucide-react';
+import { AlertCircle, Check, CloudOff, HardDrive, Loader2 } from 'lucide-react';
 import { useCloudSync } from '../cloud/CloudSyncContext';
 import { useApp } from '../state/AppContext';
 import { localPersistencePresentation } from '../state/persistence';
@@ -8,32 +8,55 @@ export function CloudStatusBadge() {
   const { localPersistence } = useApp();
   const local = localPersistencePresentation(localPersistence);
   const localProblem = !localPersistence.ok;
-  const retryable = status.phase === 'error' || status.phase === 'offline';
-  const Icon =
-    localProblem
-      ? AlertCircle
-      : status.phase === 'saved'
+  const retryable = !localProblem && (status.phase === 'error' || status.phase === 'offline');
+  const busy = !localProblem && (status.phase === 'saving' || status.phase === 'connecting');
+
+  const Icon = localProblem
+    ? AlertCircle
+    : status.phase === 'saved'
       ? Check
-      : status.phase === 'saving' || status.phase === 'connecting'
+      : busy
         ? Loader2
         : status.phase === 'error'
           ? AlertCircle
           : status.phase === 'offline'
             ? CloudOff
-            : Cloud;
-  const label = localProblem ? local.label : status.phase === 'saved' ? 'Cloud saved' : status.message;
-  const phase = localProblem ? 'error' : status.phase;
+            : HardDrive;
+
+  const short = localProblem
+    ? localPersistence.code === 'unsupported-version' ? 'Update app' : 'Unsaved'
+    : status.phase === 'saved'
+      ? 'Saved'
+      : busy
+        ? 'Saving'
+        : status.phase === 'error'
+          ? 'Retry'
+          : status.phase === 'offline'
+            ? 'Offline'
+            : 'On device';
+
+  const phaseClass = localProblem ? 'error' : status.phase === 'setup-needed' ? 'device-only' : status.phase;
+  const label = localProblem
+    ? `${local.label}. ${local.detail}`
+    : status.phase === 'saved'
+      ? 'Cloud saved'
+      : retryable
+        ? `${status.message}. Tap to retry.`
+        : status.phase === 'unavailable' || status.phase === 'device-only' || status.phase === 'setup-needed'
+          ? `${local.label}. ${status.message}.`
+          : status.message;
+
   return (
     <button
       type="button"
-      className={`atlas-cloud-status is-${phase}${retryable && !localProblem ? ' is-retryable' : ''}`}
-      onClick={retryable && !localProblem ? retry : undefined}
-      disabled={!retryable || localProblem}
-      title={localProblem ? `${local.detail} Cloud: ${status.message}` : retryable ? `${label}. Tap to retry.` : label}
-      aria-label={localProblem ? `${local.label}. ${local.detail}` : retryable ? `${label}. Retry cloud save.` : label}
+      className={`ws-pill ws-cloud is-${phaseClass}`}
+      onClick={retryable ? retry : undefined}
+      disabled={!retryable}
+      title={label}
+      aria-label={label}
     >
-      <Icon size={13} className={!localProblem && (status.phase === 'saving' || status.phase === 'connecting') ? 'animate-spin' : ''} aria-hidden="true" />
-      <span>{localProblem ? (localPersistence.code === 'unsupported-version' ? 'Update app' : 'Unsaved') : status.phase === 'saved' ? 'Saved' : status.phase === 'unavailable' || status.phase === 'device-only' ? 'Local ready' : status.phase}</span>
+      <Icon size={15} className={busy ? 'animate-spin' : ''} aria-hidden="true" />
+      <span className="ws-cloud-label">{short}</span>
     </button>
   );
 }

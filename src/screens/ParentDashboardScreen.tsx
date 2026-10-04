@@ -1,24 +1,22 @@
-import { useEffect, useState } from 'react';
-import { Settings as SettingsIcon, Coins, ChevronRight, Lock, LogOut, BookMarked, TrendingUp } from 'lucide-react';
+import { useEffect, useState, type CSSProperties } from 'react';
+import { BookMarked, ChevronRight, Cloud, Coins, LogOut, Settings as SettingsIcon, ShieldCheck, TrendingUp } from 'lucide-react';
 import { useApp } from '../state/AppContext';
 import { useDailyCap } from '../hooks/useDailyCap';
 import { Button } from '../components/ui/Button';
 import { prettyDate } from '../utils/date';
 import { DIMENSIONS } from '../data/dimensionTheme';
+import { toneVars } from '../data/tones';
 import { WritingShapeRadar } from '../components/visuals/WritingShapeRadar';
 import { DimensionSparklines } from '../components/visuals/DimensionSparklines';
 import { averageBreakdown, entriesWithLatestValidGrading } from '../services/writerMemory';
 import { browserDeadlineRuntime, parentAccessIsActive, startDeadlineWatcher } from '../services/accessTiming';
 import type { Screen } from '../types';
 import { gradingPresentation } from '../services/gradingPresentation';
+import { TierChip } from '../components/TierChip';
+import { StarField } from '../components/art/StarField';
+import { CloudStatusPanel } from '../components/CloudStatusPanel';
 
-const TIER_TEXT: Record<string, string> = {
-  none: 'text-text-faint',
-  bronze: 'text-tier-bronze',
-  silver: 'text-tier-silver',
-  gold: 'text-tier-gold',
-  platinum: 'text-tier-platinum',
-};
+const rise = (index: number) => ({ '--i': index } as CSSProperties);
 
 export function ParentDashboardScreen() {
   const { state, dispatch } = useApp();
@@ -66,153 +64,152 @@ export function ParentDashboardScreen() {
   const startShape = gradedEntries.length >= 4 ? averageBreakdown(gradedEntries.slice(0, 5)) ?? undefined : undefined;
 
   return (
-    <div className="space-y-5 animate-slide-up">
-      <header>
-        <div className="flex items-center gap-2 text-gold mb-1">
-          <Lock size={14} />
-          <span className="text-micro uppercase tracking-wider font-semibold">Parent mode</span>
+    <div className="ws-page">
+      <section className="ws-parent-head ws-night ws-rise" aria-labelledby="parent-title">
+        <StarField seed={13} count={30} sparkles={3} />
+        <div>
+          <span className="ws-parent-badge"><ShieldCheck size={14} aria-hidden="true" /> Parent mode</span>
+          <h1 id="parent-title" className="ws-h1 mt-3">Parent dashboard</h1>
+          <p className="ws-lede">How {state.writer.name} is writing, what&apos;s waiting to be paid, and whether progress is backed up.</p>
         </div>
-        <h1 className="font-display text-h1 font-semibold text-text">Parent dashboard</h1>
-        <p className="text-text-muted text-caption mt-1">
-          Parent access lasts 10 minutes.
-        </p>
-      </header>
-
-      <section className="grid grid-cols-2 gap-3">
-        <div className="bg-surface border border-line rounded-xl p-4">
-          <div className="text-micro text-text-faint uppercase tracking-wider mb-1">Pending</div>
-          <div className="font-mono text-h1 font-semibold text-gold tabular-nums">${state.earnings.lifetimePending.toFixed(2)}</div>
-        </div>
-        <div className="bg-surface border border-line rounded-xl p-4">
-          <div className="text-micro text-text-faint uppercase tracking-wider mb-1">Paid</div>
-          <div className="font-mono text-h1 font-semibold text-text tabular-nums">${state.earnings.lifetimePaid.toFixed(2)}</div>
-        </div>
+        <span className="ws-small text-right">Parent access lasts 10 minutes</span>
       </section>
 
-      <section className="bg-surface border border-line rounded-xl p-4">
-        <h2 className="font-display text-h3 font-semibold text-text mb-3">Activity</h2>
-        <div className="grid grid-cols-3 gap-3 text-caption">
-          <Stat label="Today" value={`$${cap.earnedToday.toFixed(2)}`} sub={`/ $${cap.cap.toFixed(2)}`} />
-          <Stat label="This week" value={`${week.length}`} sub={`avg ${avg(week) ?? '—'}`} />
-          <Stat label="This month" value={`${month.length}`} sub={`avg ${avg(month) ?? '—'}`} />
+      <div className="ws-kpis ws-rise" style={rise(1)}>
+        <Kpi tone="gold" label="Waiting payout" value={`$${state.earnings.lifetimePending.toFixed(2)}`} sub={`$${state.earnings.lifetimePaid.toFixed(2)} paid so far`} />
+        <Kpi tone="story" label="Earned today" value={`$${cap.earnedToday.toFixed(2)}`} sub={`of a $${cap.cap.toFixed(2)} daily cap`} />
+        <Kpi tone="scene" label="This week" value={`${week.length}`} sub={`pieces · avg score ${avg(week) ?? '—'}`} />
+        <Kpi tone="mystery" label="This month" value={`${month.length}`} sub={`pieces · avg score ${avg(month) ?? '—'}`} />
+      </div>
+
+      <section className="ws-card ws-card-pad ws-rise" style={rise(2)} aria-labelledby="backup-title">
+        <div className="ws-section-head">
+          <div>
+            <p className="ws-kicker"><Cloud size={14} aria-hidden="true" /> Progress safety</p>
+            <h2 id="backup-title" className="ws-h2">Saved progress</h2>
+          </div>
+          <button type="button" className="ws-link-btn" onClick={() => enterParentScreen('settings')}>
+            Backup settings <ChevronRight size={15} aria-hidden="true" />
+          </button>
         </div>
+        <CloudStatusPanel />
       </section>
 
       {hasGrowthView && (
-        <section className="bg-surface border border-line rounded-xl p-5">
-          <div className="flex items-center gap-2 mb-1">
-            <TrendingUp size={16} className="text-teal" />
-            <h2 className="font-display text-h3 font-semibold text-text">Skill growth</h2>
+        <section className="ws-card ws-card-pad ws-rise" style={rise(3)} aria-labelledby="growth-title">
+          <div className="ws-section-head">
+            <div>
+              <p className="ws-kicker"><TrendingUp size={14} aria-hidden="true" /> Skill growth</p>
+              <h2 id="growth-title" className="ws-h2">How the writing is changing</h2>
+            </div>
           </div>
-          <p className="text-caption text-text-muted mb-3">
+          <p className="ws-body mt-0">
             {memory.strength && memory.growthEdge ? (
               <>
-                Strongest at <span className="font-semibold" style={{ color: DIMENSIONS[memory.strength].color }}>{DIMENSIONS[memory.strength].label.toLowerCase()}</span>;
-                working on <span className="font-semibold" style={{ color: DIMENSIONS[memory.growthEdge].color }}>{DIMENSIONS[memory.growthEdge].label.toLowerCase()}</span>.
+                Strongest at <strong style={{ color: DIMENSIONS[memory.strength].ink }}>{DIMENSIONS[memory.strength].label.toLowerCase()}</strong>;
+                working on <strong style={{ color: DIMENSIONS[memory.growthEdge].ink }}>{DIMENSIONS[memory.growthEdge].label.toLowerCase()}</strong>.
               </>
             ) : (
               'A few more pieces will reveal strengths and growth areas.'
             )}
           </p>
-          <WritingShapeRadar current={memory.mastery} baseline={startShape} size={230} />
-          {startShape && (
-            <p className="text-micro text-text-faint uppercase tracking-wide text-center -mt-1 mb-3">
-              Now (gold) vs. when they started (grey)
-            </p>
-          )}
-          <div className="pt-3 border-t border-line">
-            <DimensionSparklines entries={state.entries} />
-          </div>
-          <div className="grid grid-cols-2 gap-3 mt-4 pt-4 border-t border-line">
-            <Stat label="Words learned" value={`${memory.vocabularyVault.length}`} sub="in their vocab vault" />
-            <Stat label="Craft skills" value={`${state.craft.masteredSkills.length}`} sub={`mastered · ${state.craft.practicedSkills.length} tried`} />
+          <div className="ws-grid-2 is-even">
+            <div>
+              <div className="ws-radar-wrap"><WritingShapeRadar current={memory.mastery} baseline={startShape} size={340} /></div>
+              {startShape && (
+                <div className="ws-legend" aria-hidden="true">
+                  <span><i style={{ background: '#F2C45A', border: '2px solid #C98A1C' }} /> Now</span>
+                  <span><i style={{ background: 'rgba(59, 66, 102, 0.12)', border: '2px dashed rgba(59, 66, 102, 0.55)' }} /> When they started</span>
+                </div>
+              )}
+            </div>
+            <div className="grid content-start gap-4">
+              <DimensionSparklines entries={state.entries} compact />
+              <div className="grid grid-cols-2 gap-3">
+                <Kpi tone="vocabulary" label="Words learned" value={`${memory.vocabularyVault.length}`} sub="in the vocab vault" flat />
+                <Kpi tone="success" label="Craft skills" value={`${state.craft.masteredSkills.length}`} sub={`mastered · ${state.craft.practicedSkills.length} tried`} flat />
+              </div>
+            </div>
           </div>
         </section>
       )}
 
-      <section className="space-y-2">
-        <h2 className="font-display text-h3 font-semibold text-text">Recent entries</h2>
-        {recent.length === 0 ? (
-          <p className="text-caption text-text-muted py-4">No entries yet.</p>
-        ) : (
-          recent.map((e) => {
-            const grade = gradingPresentation(e);
-            return (
-              <button
-                key={e.id}
-                onClick={() => dispatch({ type: 'NAV', screen: 'journal' })}
-                className="w-full text-left bg-surface border border-line rounded-xl p-3 hover:border-gold/30 transition-colors"
-              >
-                <div className="flex justify-between text-caption text-text-muted">
-                  <span className="truncate">{e.challengeTitle}</span>
-                  <span className="shrink-0">{prettyDate(e.createdAt)}</span>
-                </div>
-                <div className="flex items-center gap-2 text-micro mt-1">
-                  <span className={`uppercase tracking-wider font-semibold ${grade.available ? TIER_TEXT[e.judge.tier] : 'text-text-faint'}`}>
-                    {grade.tierText}
-                  </span>
-                  <span className="text-text-faint">·</span>
-                  <span className="text-text-faint tabular-nums">{grade.available ? `${grade.scoreText} · ` : ''}{e.wordCount} words</span>
-                </div>
-              </button>
-            );
-          })
-        )}
-      </section>
+      <div className="ws-grid-2 ws-rise" style={rise(4)}>
+        <section className="ws-card ws-card-pad" aria-labelledby="recent-entries-title">
+          <div className="ws-section-head">
+            <div>
+              <p className="ws-kicker"><BookMarked size={14} aria-hidden="true" /> Latest pages</p>
+              <h2 id="recent-entries-title" className="ws-h2">Recent entries</h2>
+            </div>
+          </div>
+          {recent.length === 0 ? (
+            <p className="ws-body">No entries yet.</p>
+          ) : (
+            <div className="ws-action-list">
+              {recent.map((e) => {
+                const grade = gradingPresentation(e);
+                return (
+                  <button key={e.id} type="button" onClick={() => dispatch({ type: 'NAV', screen: 'journal' })} className="ws-action" style={{ minHeight: '3.5rem' }}>
+                    <span className="ws-action-label">
+                      {e.challengeTitle}
+                      <small>{prettyDate(e.createdAt)} · {grade.available ? `${grade.scoreText} · ` : ''}{e.wordCount} words</small>
+                    </span>
+                    <TierChip tier={grade.available ? e.judge.tier : 'none'} label={grade.tierText} />
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </section>
 
-      <section className="space-y-2">
-        <ActionRow
-          icon={<Coins size={18} />}
-          label="Pay out pending earnings"
-          onClick={() => enterParentScreen('wallet')}
-          disabled={state.earnings.lifetimePending === 0}
-        />
-        <ActionRow
-          icon={<BookMarked size={18} />}
-          label="Read all entries"
-          onClick={() => dispatch({ type: 'NAV', screen: 'journal' })}
-        />
-        <ActionRow
-          icon={<SettingsIcon size={18} />}
-          label="Settings"
-          onClick={() => enterParentScreen('settings')}
-        />
-      </section>
-
-      <Button
-        variant="ghost"
-        fullWidth
-        onClick={() => {
-          dispatch({ type: 'LOCK_PARENT' });
-          dispatch({ type: 'NAV_RESET', screen: 'home' });
-        }}
-      >
-        <LogOut size={16} /> Lock parent mode
-      </Button>
+        <section className="ws-card ws-card-pad" aria-labelledby="parent-actions-title">
+          <div className="ws-section-head">
+            <div>
+              <p className="ws-kicker">Grown-up tools</p>
+              <h2 id="parent-actions-title" className="ws-h2">Actions</h2>
+            </div>
+          </div>
+          <div className="ws-action-list">
+            <ActionRow tone="gold" icon={<Coins size={18} />} label="Pay out pending earnings" sub={`$${state.earnings.lifetimePending.toFixed(2)} waiting`} onClick={() => enterParentScreen('wallet')} disabled={state.earnings.lifetimePending === 0} />
+            <ActionRow tone="scene" icon={<BookMarked size={18} />} label="Read all entries" sub={`${state.entries.length} pieces in the journal`} onClick={() => dispatch({ type: 'NAV', screen: 'journal' })} />
+            <ActionRow tone="night" icon={<SettingsIcon size={18} />} label="Settings & backup" sub="Coach, daily cap, PIN, cloud recovery" onClick={() => enterParentScreen('settings')} />
+          </div>
+          <Button
+            variant="ghost"
+            fullWidth
+            className="mt-4"
+            onClick={() => {
+              dispatch({ type: 'LOCK_PARENT' });
+              dispatch({ type: 'NAV_RESET', screen: 'home' });
+            }}
+          >
+            <LogOut size={16} aria-hidden="true" /> Lock parent mode
+          </Button>
+        </section>
+      </div>
     </div>
   );
 }
 
-function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
+function Kpi({ tone, label, value, sub, flat }: { tone: Parameters<typeof toneVars>[0]; label: string; value: string; sub?: string; flat?: boolean }) {
   return (
-    <div>
-      <div className="text-micro text-text-faint uppercase tracking-wider">{label}</div>
-      <div className="font-mono text-h3 font-semibold text-text tabular-nums">{value}</div>
-      {sub && <div className="text-micro text-text-faint tabular-nums">{sub}</div>}
+    <div className={`ws-card ws-kpi ${flat ? 'ws-card--flat' : ''}`} style={toneVars(tone)}>
+      <div className="flex items-center gap-2">
+        <span className="h-2.5 w-2.5 rounded-full" style={{ background: 'var(--tone)' }} aria-hidden="true" />
+        <span className="ws-kpi-label">{label}</span>
+      </div>
+      <div className="ws-kpi-value">{value}</div>
+      {sub && <div className="ws-kpi-sub">{sub}</div>}
     </div>
   );
 }
 
-function ActionRow({ icon, label, onClick, disabled }: { icon: React.ReactNode; label: string; onClick: () => void; disabled?: boolean }) {
+function ActionRow({ tone, icon, label, sub, onClick, disabled }: { tone: Parameters<typeof toneVars>[0]; icon: React.ReactNode; label: string; sub?: string; onClick: () => void; disabled?: boolean }) {
   return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className="w-full bg-surface border border-line rounded-xl p-4 flex items-center gap-3 hover:border-gold/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed text-left"
-    >
-      <span className="bg-gold/15 text-gold rounded-lg p-2">{icon}</span>
-      <span className="flex-1 font-medium text-text">{label}</span>
-      <ChevronRight size={16} className="text-text-faint" />
+    <button type="button" onClick={onClick} disabled={disabled} className="ws-action" style={toneVars(tone)}>
+      <span className="ws-medallion ws-medallion--sm" aria-hidden="true">{icon}</span>
+      <span className="ws-action-label">{label}{sub && <small>{sub}</small>}</span>
+      <ChevronRight size={17} className="text-text-muted" aria-hidden="true" />
     </button>
   );
 }

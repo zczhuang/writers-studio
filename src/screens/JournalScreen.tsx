@@ -1,20 +1,15 @@
-import { useMemo, useState } from 'react';
-import { BookOpen, Quote } from 'lucide-react';
+import { useMemo, useState, type CSSProperties } from 'react';
+import { BookMarked, Feather, History, Quote } from 'lucide-react';
 import { useApp } from '../state/AppContext';
 import { EntryCard } from '../components/EntryCard';
 import { Modal } from '../components/ui/Modal';
+import { TierChip } from '../components/TierChip';
 import { MODE_META } from '../data/prompts';
+import { MODE_THEME } from '../data/modeTheme';
+import { toneVars } from '../data/tones';
 import type { EntryVersion, Mode } from '../types';
 import { prettyDate } from '../utils/date';
 import { gradingPresentation } from '../services/gradingPresentation';
-
-const TIER_TEXT: Record<string, string> = {
-  none: 'text-text-faint',
-  bronze: 'text-tier-bronze',
-  silver: 'text-tier-silver',
-  gold: 'text-tier-gold',
-  platinum: 'text-tier-platinum',
-};
 
 export function JournalScreen() {
   const { state } = useApp();
@@ -35,87 +30,99 @@ export function JournalScreen() {
   const displayedGrade = entry
     ? gradingPresentation(selectedVersion ?? entry)
     : null;
+  const displayedJudge = selectedVersion?.judge ?? entry?.judge;
+  const totalWords = state.entries.reduce((sum, item) => sum + item.wordCount, 0);
 
   return (
-    <div className="space-y-4 animate-slide-up">
-      <header>
-        <h1 className="font-display text-h1 font-semibold text-text">Journal</h1>
-        <p className="text-text-muted text-caption mt-1">Every piece you've written, in one place.</p>
+    <div className="ws-page">
+      <header className="ws-page-head ws-rise">
+        <div>
+          <p className="ws-kicker"><BookMarked size={14} aria-hidden="true" /> Every page, kept safe</p>
+          <h1 className="ws-h1">Journal</h1>
+          <p className="ws-lede">Every piece you&apos;ve written, with each draft along the way.</p>
+        </div>
+        <div className="flex gap-6 text-right">
+          <div>
+            <div className="font-display text-[2rem] font-semibold leading-none tabular-nums">{state.entries.length}</div>
+            <div className="mt-1 text-[0.8rem] font-bold text-text-muted">pieces</div>
+          </div>
+          <div>
+            <div className="font-display text-[2rem] font-semibold leading-none tabular-nums">{totalWords.toLocaleString()}</div>
+            <div className="mt-1 text-[0.8rem] font-bold text-text-muted">words</div>
+          </div>
+        </div>
       </header>
 
-      <div className="flex gap-2 overflow-x-auto -mx-1 px-1 pb-1">
-        <Chip label="All" active={filter === 'all'} onClick={() => setFilter('all')} count={state.entries.length} />
-        {(Object.keys(MODE_META) as Mode[]).map((m) => (
-          <Chip
-            key={m}
-            label={MODE_META[m].label}
-            active={filter === m}
-            onClick={() => setFilter(m)}
-            count={state.entries.filter((e) => e.mode === m).length}
-          />
-        ))}
+      <div className="ws-filter-row ws-rise" style={{ '--i': 1 } as CSSProperties} role="group" aria-label="Filter by world">
+        <FilterChip label="All" active={filter === 'all'} onClick={() => setFilter('all')} count={state.entries.length} />
+        {(Object.keys(MODE_META) as Mode[]).map((m) => {
+          const Icon = MODE_THEME[m].Icon;
+          return (
+            <FilterChip
+              key={m}
+              label={MODE_META[m].label}
+              icon={<Icon size={15} aria-hidden="true" />}
+              active={filter === m}
+              onClick={() => setFilter(m)}
+              count={state.entries.filter((e) => e.mode === m).length}
+              style={toneVars(m)}
+            />
+          );
+        })}
       </div>
 
       {filtered.length === 0 ? (
-        <div className="text-center py-10 text-text-muted">
-          <BookOpen size={32} className="mx-auto mb-2 opacity-50" />
-          <p className="text-caption">No pieces yet — your first one will appear here.</p>
+        <div className="ws-empty">
+          <Feather size={34} aria-hidden="true" />
+          <h2 className="ws-h3">{filter === 'all' ? 'Your journal is waiting' : `No ${MODE_META[filter].label.toLowerCase()} pieces yet`}</h2>
+          <p>Your first piece will appear here, along with every revision you make.</p>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="ws-journal-grid ws-rise" style={{ '--i': 2 } as CSSProperties}>
           {filtered.map((e) => (
             <EntryCard key={e.id} entry={e} onClick={() => { setOpenId(e.id); setOpenVersionId(e.currentVersionId ?? null); }} />
           ))}
         </div>
       )}
 
-      <Modal open={!!entry} onClose={() => { setOpenId(null); setOpenVersionId(null); }} title={entry?.challengeTitle}>
-        {entry && (
-          <div className="space-y-3">
-            <div className="flex items-center justify-between text-caption">
-              <span className="text-text-muted">{MODE_META[entry.mode].label}</span>
-              <span className="text-text-faint">{prettyDate(entry.createdAt)}</span>
-            </div>
-            <div className="flex items-center gap-3 text-caption">
-              <span className={`font-semibold ${displayedGrade?.available ? TIER_TEXT[(selectedVersion?.judge ?? entry.judge).tier] : 'text-text-faint'}`}>{displayedGrade?.tierText}</span>
-              {displayedGrade?.available && (
-                <>
-                  <span className="text-text-faint">·</span>
-                  <span className="text-text-muted tabular-nums">{displayedGrade.scoreText}</span>
-                </>
-              )}
-              <span className="text-text-faint">·</span>
-              <span className="text-text-muted tabular-nums">{selectedVersion?.wordCount ?? entry.wordCount} words</span>
+      <Modal
+        open={!!entry}
+        onClose={() => { setOpenId(null); setOpenVersionId(null); }}
+        title={entry?.challengeTitle}
+        eyebrow={entry ? <>{MODE_META[entry.mode].label} · {prettyDate(entry.createdAt)}</> : undefined}
+      >
+        {entry && displayedJudge && (
+          <div className="grid gap-4" style={toneVars(entry.mode)}>
+            <div className="ws-reader-meta">
+              <TierChip tier={displayedGrade?.available ? displayedJudge.tier : 'none'} label={displayedGrade?.tierText ?? ''} />
+              {displayedGrade?.available && <span className="ws-chip" style={toneVars('neutral')}>{displayedGrade.scoreText}</span>}
+              <span className="ws-chip" style={toneVars('neutral')}>{selectedVersion?.wordCount ?? entry.wordCount} words</span>
             </div>
             {versions.length > 1 && (
-              <div className="rounded-lg border border-line bg-paper/50 p-3">
-                <div className="text-micro font-semibold uppercase tracking-wider text-text-faint mb-2">Draft history</div>
+              <div className="ws-versions">
+                <div className="ws-kicker"><History size={14} aria-hidden="true" /> Draft history</div>
                 <div className="flex flex-wrap gap-2">
                   {versions.map((version) => (
                     <button
                       key={version.id}
                       type="button"
                       onClick={() => setOpenVersionId(version.id)}
-                      className={`rounded-full border px-3 py-1.5 text-micro font-semibold transition-colors ${
-                        selectedVersion?.id === version.id
-                          ? 'border-gold bg-gold/15 text-text'
-                          : 'border-line bg-surface text-text-muted hover:border-line-2'
-                      }`}
+                      className={`ws-version-btn ${selectedVersion?.id === version.id ? 'is-active' : ''}`}
+                      aria-pressed={selectedVersion?.id === version.id}
                     >
                       {versionLabel(version)}
                     </button>
                   ))}
                 </div>
-                <p className="text-micro text-text-faint mt-2">Earlier drafts are read-only. Keeping them does not award rewards again.</p>
+                <p className="ws-small mt-2 mb-0">Earlier drafts are read-only. Keeping them does not award rewards again.</p>
               </div>
             )}
-            <p className="text-caption text-text-faint italic">{entry.prompt}</p>
-            <hr className="border-line" />
-            <p className="font-serif text-body text-text whitespace-pre-wrap leading-relaxed">{selectedVersion?.text ?? entry.text}</p>
-            {(selectedVersion?.judge ?? entry.judge).celebrate && (
-              <div className="bg-gold/10 border border-gold/25 rounded-lg p-3 flex items-start gap-2">
-                <Quote size={14} className="text-gold mt-0.5 shrink-0" />
-                <p className="font-serif italic text-caption text-text">"{(selectedVersion?.judge ?? entry.judge).celebrate}."</p>
+            <p className="ws-reader-prompt">{entry.prompt}</p>
+            <p className="ws-reader-text">{selectedVersion?.text ?? entry.text}</p>
+            {displayedJudge.celebrate && (
+              <div className="ws-callout ws-callout--info">
+                <Quote size={16} aria-hidden="true" />
+                <span className="ws-read italic">&ldquo;{displayedJudge.celebrate}.&rdquo;</span>
               </div>
             )}
           </div>
@@ -132,17 +139,12 @@ function versionLabel(version: EntryVersion): string {
   return `Revision ${version.revision}`;
 }
 
-function Chip({ label, active, onClick, count }: { label: string; active: boolean; onClick: () => void; count: number }) {
+function FilterChip({ label, active, onClick, count, icon, style }: { label: string; active: boolean; onClick: () => void; count: number; icon?: React.ReactNode; style?: CSSProperties }) {
   return (
-    <button
-      onClick={onClick}
-      className={`shrink-0 px-3 py-1.5 rounded-full text-caption font-medium border transition-colors ${
-        active
-          ? 'bg-gold text-ink border-gold'
-          : 'bg-surface text-text-muted border-line hover:border-line-2'
-      }`}
-    >
-      {label} <span className="opacity-70 ml-1">{count}</span>
+    <button type="button" onClick={onClick} className={`ws-filter ${active ? 'is-active' : ''}`} aria-pressed={active} style={style}>
+      {icon}
+      {label}
+      <span className="ws-filter-count">{count}</span>
     </button>
   );
 }

@@ -1,4 +1,4 @@
-import type { InputHTMLAttributes } from 'react';
+import { useId, type InputHTMLAttributes } from 'react';
 
 interface Props extends InputHTMLAttributes<HTMLInputElement> {
   label?: string;
@@ -6,16 +6,22 @@ interface Props extends InputHTMLAttributes<HTMLInputElement> {
   error?: string;
 }
 
-export function Input({ label, hint, error, className = '', ...rest }: Props) {
+export function Input({ label, hint, error, className = '', id, ...rest }: Props) {
+  const generated = useId();
+  const inputId = id ?? generated;
+  const describedBy = error ? `${inputId}-error` : hint ? `${inputId}-hint` : undefined;
   return (
-    <label className="block">
-      {label && <div className="mb-1.5 text-caption font-medium text-text-muted">{label}</div>}
+    <div className="ws-field">
+      {label && <label className="ws-field-label" htmlFor={inputId}>{label}</label>}
       <input
         {...rest}
-        className={`w-full bg-surface text-text placeholder:text-text-faint border border-line-2 rounded-lg px-4 py-3 font-sans text-body focus:outline-none focus:border-gold/60 focus:ring-2 focus:ring-gold/20 ${className}`}
+        id={inputId}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={describedBy}
+        className={`ws-input ${className}`}
       />
-      {hint && !error && <div className="mt-1 text-caption text-text-faint">{hint}</div>}
-      {error && <div className="mt-1 text-caption text-rust">{error}</div>}
-    </label>
+      {hint && !error && <div id={`${inputId}-hint`} className="ws-field-hint">{hint}</div>}
+      {error && <div id={`${inputId}-error`} className="ws-field-error">{error}</div>}
+    </div>
   );
 }
