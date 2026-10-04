@@ -1,6 +1,6 @@
 # Writer's Studio cloud backup
 
-> Last updated: 2026-10-03
+> Last updated: 2026-10-04
 
 Writer's Studio is offline-first. Local saves remain authoritative while offline, and the Supabase layer adds private backup, recovery, and multi-device merging without asking the child for an email address.
 
@@ -21,6 +21,17 @@ Writer's Studio is offline-first. Local saves remain authoritative while offline
 7. Run the live isolation/round-trip checks below before calling cloud backup operational.
 
 If the environment variables are absent, the app remains fully usable and does not attempt auth or database calls. The device badge reports the verified local-storage result; quota, recovery-checkpoint, damaged-save, and update-required states are shown as unsaved/actionable instead of claiming success.
+
+## Provisioning status
+
+As of 2026-10-04 no Supabase project exists for Writer's Studio, and the production build has no `VITE_SUPABASE_*` values, so the app runs device-only: progress lives in each browser's localStorage. The Parent dashboard and Settings show "Cloud backup is not connected" until the checklist above is complete. If anonymous sign-ins are left off after the project is connected, the app shows "Cloud backup needs one setup step" instead of a generic error.
+
+## Reliability
+
+- **Automatic retries.** A failed save retries after 4 s, 15 s, 45 s, 2 min, then every 5 min. Any edit, reconnect, or tab focus retries sooner. A successful save resets the backoff.
+- **Flush on hide.** Hiding or closing the tab (`visibilitychange`, `pagehide`) starts a save immediately instead of waiting for the 650 ms edit debounce. Returning to the tab pulls and merges changes from other devices.
+- **Self-healing sign-in.** If the anonymous session is lost (cleared storage, revoked or reused refresh token, or the server no longer lists the device as a member), the engine claims its own space with the recovery code already stored in device metadata, then retries. The claim must return the same space and generation or nothing is applied. Pull and sync calls still never mint an identity on their own.
+- **Setup errors are named.** `anonymous_provider_disabled` maps to a `setup-needed` status that rechecks every 5 minutes.
 
 ## Data and security model
 

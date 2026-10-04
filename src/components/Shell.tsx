@@ -1,17 +1,33 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Award, BookMarked, BookOpen, ChevronLeft, Home as HomeIcon, Library, Settings as SettingsIcon, Wallet } from 'lucide-react';
+import { Award, BookMarked, ChevronLeft, Home as HomeIcon, Library, PenLine, Settings as SettingsIcon, ShieldCheck, Wallet } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { useApp } from '../state/AppContext';
 import { EarningsPill } from './EarningsPill';
 import { ToastHost } from './ui/Toast';
 import type { Screen } from '../types';
 import { CloudStatusBadge } from './CloudStatusBadge';
+import { BrandMark } from './art/BrandMark';
+import { StarField } from './art/StarField';
+import { ProgressRing } from './art/ProgressRing';
+import { rankSnapshot, recommendedChallenge } from '../utils/progression';
+import { LEVEL_ICONS } from './journey/levelIcons';
+import { toneVars } from '../data/tones';
 
 const HIDE_NAV_ON: Screen[] = ['onboarding', 'write', 'result', 'parent-gate'];
+const READING_SCREENS: Screen[] = ['write', 'result', 'journal', 'parent-dashboard', 'settings'];
+
+interface NavDef {
+  id: string;
+  label: string;
+  Icon: LucideIcon;
+  active: boolean;
+  onClick: () => void;
+}
 
 export function Shell({ children }: { children: ReactNode }) {
   const { state, dispatch } = useApp();
   const showBack = state.navStack.length > 0 && state.screen !== 'onboarding';
-  const hideNav = HIDE_NAV_ON.includes(state.screen);
+  const focusMode = HIDE_NAV_ON.includes(state.screen);
   const [clockMs, setClockMs] = useState(0);
   const mainRef = useRef<HTMLElement>(null);
 
@@ -25,7 +41,6 @@ export function Shell({ children }: { children: ReactNode }) {
   }, []);
 
   const isParent = clockMs > 0 && state.parentUnlockedUntil > clockMs;
-  const readableScreen = ['write', 'result', 'journal', 'craft-library', 'parent-dashboard', 'settings'].includes(state.screen);
 
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
@@ -34,76 +49,129 @@ export function Shell({ children }: { children: ReactNode }) {
     mainRef.current?.focus({ preventScroll: true });
   }, [state.screen]);
 
-  const mainClass = readableScreen ? 'atlas-main atlas-main-reading' : 'atlas-main';
+  const go = (screen: Screen) => dispatch({ type: 'NAV', screen });
+  const openParent = () => {
+    if (isParent) go('parent-dashboard');
+    else dispatch({ type: 'REQUEST_PARENT_GATE', target: 'parent-dashboard' });
+  };
+  const startWriting = () => {
+    const recommendation = recommendedChallenge(state.entries, state.memory);
+    dispatch({ type: 'PICK_MODE', mode: recommendation.mode });
+    dispatch({ type: 'PICK_CHALLENGE', challengeId: recommendation.challenge.id });
+    dispatch({ type: 'NAV', screen: 'write' });
+  };
+
+  const home: NavDef = { id: 'home', label: 'Home', Icon: HomeIcon, active: state.screen === 'home' || state.screen === 'mode-list', onClick: () => dispatch({ type: 'NAV_RESET', screen: 'home' }) };
+  const craft: NavDef = { id: 'craft', label: 'Craft', Icon: Library, active: state.screen === 'craft-library', onClick: () => go('craft-library') };
+  const journal: NavDef = { id: 'journal', label: 'Journal', Icon: BookMarked, active: state.screen === 'journal', onClick: () => go('journal') };
+  const badges: NavDef = { id: 'badges', label: 'Badges', Icon: Award, active: state.screen === 'badges', onClick: () => go('badges') };
+  const wallet: NavDef = { id: 'wallet', label: 'Wallet', Icon: Wallet, active: state.screen === 'wallet', onClick: () => go('wallet') };
+  const parent: NavDef = { id: 'parent', label: 'Parent', Icon: SettingsIcon, active: state.screen === 'parent-dashboard' || state.screen === 'settings', onClick: openParent };
+
+  // The dock has five slots; in parent mode the Parent tab replaces Badges.
+  const dockItems = [home, craft, wallet, journal, isParent ? parent : badges];
+  const sideItems = [home, craft, journal, badges, wallet];
+
+  const rank = rankSnapshot(state.writer.xp);
+  const RankIcon = LEVEL_ICONS[rank.level.icon] ?? PenLine;
+  const mainClass = ['ws-main', READING_SCREENS.includes(state.screen) ? 'is-reading' : '', focusMode ? 'is-focus' : ''].filter(Boolean).join(' ');
 
   return (
-    <div className="min-h-screen bg-bg text-text flex flex-col">
-      <header className="atlas-header">
-        <div className={`atlas-header-inner ${showBack ? 'has-back' : ''}`}>
-          <div className="flex items-center gap-2 min-w-0">
-            {showBack && (
-              <button onClick={() => dispatch({ type: 'NAV_BACK' })} className="atlas-back-button" aria-label="Back">
-                <ChevronLeft size={20} aria-hidden="true" />
-                <span className="text-caption hidden sm:inline">Back</span>
-              </button>
-            )}
-            <div className="atlas-brand">
-              <span className="atlas-brand-mark" aria-hidden="true"><BookOpen size={19} /></span>
-              <span className="atlas-brand-copy">
-                <span className="atlas-brand-title">Writer&apos;s Studio</span>
-                <span className="atlas-brand-subtitle">your story atlas</span>
-              </span>
-              {isParent && <span className="text-caption font-sans text-gold-deep">· parent</span>}
+    <div className="ws-app">
+      <div className="ws-backdrop" aria-hidden="true" />
+
+      {!focusMode && (
+        <aside className="ws-sidebar" aria-label="Writer's Studio">
+          <StarField seed={11} count={34} sparkles={3} sparkleFrom={72} />
+          <button type="button" className="ws-brand" onClick={home.onClick} aria-label="Writer's Studio home">
+            <BrandMark />
+            <span className="ws-brand-copy">
+              <span className="ws-brand-title">Writer&apos;s Studio</span>
+              <span className="ws-brand-sub">Story atlas</span>
+            </span>
+          </button>
+
+          <button type="button" className="ws-btn ws-btn--gold ws-btn--block ws-side-cta" onClick={startWriting}>
+            <PenLine size={18} aria-hidden="true" /> Write a new page
+          </button>
+
+          <nav className="ws-side-nav" aria-label="Main navigation">
+            {sideItems.map((item) => <SideLink key={item.id} item={item} />)}
+            <p className="ws-side-label">For grown-ups</p>
+            <SideLink item={{ ...parent, label: isParent ? 'Parent dashboard' : 'Parent area', Icon: isParent ? SettingsIcon : ShieldCheck }} />
+          </nav>
+
+          <div className="ws-side-foot">
+            <div className="ws-side-rank" style={toneVars('gold')}>
+              <ProgressRing pct={rank.pct} size={46} stroke={5} label={`${rank.level.name} rank, ${Math.round(rank.pct)} percent`}>
+                <RankIcon size={18} aria-hidden="true" />
+              </ProgressRing>
+              <div className="min-w-0">
+                <strong>{rank.level.name}</strong>
+                <span>{rank.nextLevel ? `${rank.xpToNext} XP to ${rank.nextLevel.name}` : 'Final rank reached'}</span>
+              </div>
+            </div>
+            <div className="ws-side-status">
+              <CloudStatusBadge />
+              <EarningsPill />
             </div>
           </div>
-          <div className="atlas-header-actions">
-            <CloudStatusBadge />
-            <EarningsPill />
-          </div>
-        </div>
-      </header>
+        </aside>
+      )}
 
-      <main ref={mainRef} id="main-content" tabIndex={-1} className={`flex-1 ${mainClass} animate-fade-in`}>
-        {children}
-      </main>
-
-      {!hideNav && (
-        <nav className="atlas-nav" aria-label="Main navigation">
-          <div className="atlas-nav-inner">
-            <NavItem
-              icon={<HomeIcon size={20} />}
-              label="Home"
-              active={state.screen === 'home'}
-              onClick={() => dispatch({ type: 'NAV_RESET', screen: 'home' })}
-            />
-            <NavItem
-              icon={<Library size={20} />}
-              label="Craft"
-              active={state.screen === 'craft-library'}
-              onClick={() => dispatch({ type: 'NAV', screen: 'craft-library' })}
-            />
-            <NavItem
-              icon={<Wallet size={20} />}
-              label="Wallet"
-              active={state.screen === 'wallet'}
-              onClick={() => dispatch({ type: 'NAV', screen: 'wallet' })}
-            />
-            <NavItem
-              icon={<BookMarked size={20} />}
-              label="Journal"
-              active={state.screen === 'journal'}
-              onClick={() => dispatch({ type: 'NAV', screen: 'journal' })}
-            />
-            <NavItem
-              icon={isParent ? <SettingsIcon size={20} /> : <Award size={20} />}
-              label={isParent ? 'Parent' : 'Badges'}
-              active={state.screen === 'badges' || state.screen === 'parent-dashboard' || state.screen === 'settings'}
-              onClick={() => {
-                if (isParent) dispatch({ type: 'NAV', screen: 'parent-dashboard' });
-                else dispatch({ type: 'NAV', screen: 'badges' });
-              }}
-            />
+      <div className={`ws-column ${focusMode ? '' : 'has-sidebar'}`}>
+        <header className={`ws-topbar ${showBack ? 'has-back' : ''}`}>
+          <div className="ws-topbar-inner">
+            {showBack && (
+              <button type="button" onClick={() => dispatch({ type: 'NAV_BACK' })} className="ws-back" aria-label="Back">
+                <ChevronLeft size={20} aria-hidden="true" />
+                <span className="hidden sm:inline">Back</span>
+              </button>
+            )}
+            {focusMode ? (
+              <span className="ws-brand">
+                <BrandMark />
+                <span className="ws-brand-copy">
+                  <span className="ws-brand-title">Writer&apos;s Studio</span>
+                  <span className="ws-brand-sub">{isParent ? 'Parent mode' : 'Story atlas'}</span>
+                </span>
+              </span>
+            ) : (
+              <button type="button" className="ws-brand" onClick={home.onClick} aria-label="Writer's Studio home">
+                <BrandMark />
+                <span className="ws-brand-copy">
+                  <span className="ws-brand-title">Writer&apos;s Studio</span>
+                  <span className="ws-brand-sub">{isParent ? 'Parent mode' : 'Story atlas'}</span>
+                </span>
+              </button>
+            )}
+            <span className="ws-topbar-spacer" />
+            <div className="ws-topbar-actions">
+              <CloudStatusBadge />
+              <EarningsPill />
+            </div>
           </div>
+        </header>
+
+        <main ref={mainRef} id="main-content" tabIndex={-1} className={mainClass}>
+          {children}
+        </main>
+      </div>
+
+      {!focusMode && (
+        <nav className="ws-dock" aria-label="Main navigation">
+          {dockItems.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={item.onClick}
+              className={`ws-dock-item ${item.active ? 'is-active' : ''}`}
+              aria-current={item.active ? 'page' : undefined}
+            >
+              <item.Icon size={20} aria-hidden="true" />
+              <span>{item.label}</span>
+            </button>
+          ))}
         </nav>
       )}
 
@@ -112,15 +180,16 @@ export function Shell({ children }: { children: ReactNode }) {
   );
 }
 
-function NavItem({ icon, label, active, onClick }: { icon: ReactNode; label: string; active: boolean; onClick: () => void }) {
+function SideLink({ item }: { item: NavDef }) {
   return (
     <button
-      onClick={onClick}
-      className={`atlas-nav-item ${active ? 'is-active' : ''}`}
-      aria-current={active ? 'page' : undefined}
+      type="button"
+      onClick={item.onClick}
+      className={`ws-side-link ${item.active ? 'is-active' : ''}`}
+      aria-current={item.active ? 'page' : undefined}
     >
-      {icon}
-      <span className="atlas-nav-label">{label}</span>
+      <span className="ws-side-icon"><item.Icon size={18} aria-hidden="true" /></span>
+      <span>{item.label}</span>
     </button>
   );
 }

@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { SyncEngine } from '../src/cloud/syncEngine.ts';
+import { RETRY_DELAYS_MS, SETUP_RETRY_MS, SyncEngine } from '../src/cloud/syncEngine.ts';
+import { CloudAccessLostError, CloudSetupRequiredError, MissingCloudSessionError } from '../src/cloud/errors.ts';
 import { generateRecoveryCode } from '../src/cloud/recovery.ts';
 import { toCloudPayload } from '../src/cloud/model.ts';
 import { makeInitialState } from '../src/state/initialState.ts';
@@ -85,6 +86,7 @@ function makeEngine({ state, meta = null, transport, online = true, writeMeta, a
   let currentMeta = meta;
   const statuses = [];
   const applied = [];
+  const retries = [];
   const engine = new SyncEngine({
     transport,
     getState: () => currentState,
@@ -99,11 +101,17 @@ function makeEngine({ state, meta = null, transport, online = true, writeMeta, a
     isOnline: () => online,
     onStatus: (status) => statuses.push(status),
     nowIso: () => '2026-10-03T16:00:00.000Z',
+    scheduleRetry: (callback, delayMs) => {
+      const retry = { callback, delayMs, cancelled: false };
+      retries.push(retry);
+      return () => { retry.cancelled = true; };
+    },
   });
   return {
     engine,
     statuses,
     applied,
+    retries,
     getState: () => currentState,
     setState: (next) => { currentState = next; },
     getMeta: () => currentMeta,
@@ -624,4 +632,131 @@ test('stop during a delayed payload digest cannot mutate metadata or emit saved'
   assert.equal(calls.length, 0);
   assert.equal(fixture.getMeta(), null);
   assert.equal(fixture.statuses.some((status) => status.phase === 'saved'), false);
+});
+
+
+function headFor(state, spaceId, hash, version = 1) {
+  return {
+    status: 'ok',
+    spaceId,
+    generation: state.progress.generation,
+    version,
+    payload: toCloudPayload(state),
+    payloadHash: hash,
+    updatedAt: '2026-10-03T15:00:00.000Z',
+  };
+}
+
+test('a lost device sign-in relinks with its stored recovery code, then saves', async () => {
+  const state = submit(makeInitialState(), 'relink-me');
+  const meta = metaFor(state);
+  const hash = await sha256Hex(toCloudPayload(state));
+  const claims = [];
+  let pulls = 0;
+  const transport = {
+    createSpace: async () => { throw new Error('unexpected create'); },
+    async pull(spaceId) {
+      pulls += 1;
+      if (pulls === 1) throw new MissingCloudSessionError();
+      return headFor(state, spaceId, hash);
+    },
+    syncSpace: async () => { throw new Error('unexpected sync'); },
+    async claimSpace(code) {
+      claims.push(code);
+      return { ...headFor(state, meta.spaceId, hash), status: 'ok' };
+    },
+    onAuthChange: () => () => undefined,
+  };
+  const fixture = makeEngine({ state, meta, transport });
+  await fixture.engine.requestSync();
+
+  assert.deepEqual(claims, [meta.recoveryCode]);
+  assert.equal(pulls, 2);
+  assert.equal(fixture.statuses.at(-1).phase, 'saved');
+  assert.equal(fixture.getMeta().spaceId, meta.spaceId);
+  assert.equal(fixture.retries.filter((retry) => !retry.cancelled).length, 0);
+});
+
+test('a relink that answers with a different space is refused and local progress is kept', async () => {
+  const state = submit(makeInitialState(), 'keep-local');
+  const before = structuredClone(state);
+  const meta = metaFor(state);
+  const transport = {
+    createSpace: async () => { throw new Error('unexpected create'); },
+    pull: async () => { throw new CloudAccessLostError(); },
+    syncSpace: async () => { throw new Error('unexpected sync'); },
+    claimSpace: async () => ({
+      status: 'ok',
+      spaceId: '99999999-9999-4999-8999-999999999999',
+      generation: state.progress.generation,
+      version: 3,
+      payload: toCloudPayload(makeInitialState()),
+      payloadHash: 'f'.repeat(64),
+      updatedAt: '2026-10-03T15:00:00.000Z',
+    }),
+    onAuthChange: () => () => undefined,
+  };
+  const fixture = makeEngine({ state, meta, transport });
+  await fixture.engine.requestSync();
+
+  assert.deepEqual(fixture.getState(), before);
+  assert.equal(fixture.applied.length, 0);
+  assert.equal(fixture.getMeta().spaceId, meta.spaceId);
+  assert.equal(fixture.statuses.at(-1).phase, 'error');
+});
+
+test('failed saves retry on their own with growing backoff until one is saved', async () => {
+  const state = submit(makeInitialState(), 'retry-me');
+  const meta = metaFor(state);
+  const hash = await sha256Hex(toCloudPayload(state));
+  let failuresLeft = 2;
+  const transport = {
+    createSpace: async () => { throw new Error('unexpected create'); },
+    async pull(spaceId) {
+      if (failuresLeft > 0) {
+        failuresLeft -= 1;
+        throw new Error('network hiccup');
+      }
+      return headFor(state, spaceId, hash);
+    },
+    syncSpace: async () => { throw new Error('unexpected sync'); },
+    claimSpace: async () => ({ status: 'invalid' }),
+    onAuthChange: () => () => undefined,
+  };
+  const fixture = makeEngine({ state, meta, transport });
+  await fixture.engine.requestSync();
+  assert.equal(fixture.statuses.at(-1).phase, 'error');
+  assert.deepEqual(fixture.retries.map((retry) => retry.delayMs), [RETRY_DELAYS_MS[0]]);
+
+  fixture.retries[0].callback();
+  await waitFor(() => fixture.retries.length === 2, 'second retry');
+  assert.equal(fixture.retries[1].delayMs, RETRY_DELAYS_MS[1]);
+  assert.equal(fixture.statuses.at(-1).phase, 'error');
+
+  fixture.retries[1].callback();
+  await waitFor(() => fixture.statuses.at(-1).phase === 'saved', 'saved after retries');
+  assert.equal(fixture.retries.length, 2, 'no retry is scheduled after a save');
+
+  failuresLeft = 1;
+  await fixture.engine.requestSync();
+  assert.equal(fixture.retries.at(-1).delayMs, RETRY_DELAYS_MS[0], 'a save resets the backoff');
+  fixture.engine.stop();
+  assert.equal(fixture.retries.at(-1).cancelled, true);
+});
+
+test('disabled anonymous sign-ins report setup-needed and recheck slowly', async () => {
+  const state = submit(makeInitialState(), 'needs-setup');
+  const transport = {
+    createSpace: async () => { throw new CloudSetupRequiredError(); },
+    pull: async () => { throw new Error('unexpected pull'); },
+    syncSpace: async () => { throw new Error('unexpected sync'); },
+    claimSpace: async () => ({ status: 'invalid' }),
+    onAuthChange: () => () => undefined,
+  };
+  const fixture = makeEngine({ state, transport });
+  await fixture.engine.requestSync();
+
+  assert.equal(fixture.statuses.at(-1).phase, 'setup-needed');
+  assert.deepEqual(fixture.retries.map((retry) => retry.delayMs), [SETUP_RETRY_MS]);
+  assert.equal(fixture.getState().entries.length, 1);
 });

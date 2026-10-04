@@ -5,9 +5,13 @@ interface Props {
   onSubmit: (pin: string) => void | Promise<void>;
   length?: number;
   shake?: boolean;
+  /** Accept digits and Backspace from a physical keyboard while mounted. */
+  keyboard?: boolean;
 }
 
-export function PinPad({ onSubmit, length = 4, shake = false }: Props) {
+const DIGITS = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
+
+export function PinPad({ onSubmit, length = 4, shake = false, keyboard = true }: Props) {
   const [pinState, setPinState] = useState(() => ({ resetSignal: shake, value: '' }));
   const [bumping, setBumping] = useState(false);
   const submitting = useRef(false);
@@ -32,47 +36,58 @@ export function PinPad({ onSubmit, length = 4, shake = false }: Props) {
   const tap = (digit: string) => {
     updatePin((current) => (current.length < length ? current + digit : current));
     setBumping(true);
-    window.setTimeout(() => setBumping(false), 80);
+    window.setTimeout(() => setBumping(false), 90);
   };
   const back = () => updatePin((current) => current.slice(0, -1));
 
+  const latest = useRef({ tap, back });
+  useEffect(() => {
+    latest.current = { tap, back };
+  });
+
+  useEffect(() => {
+    if (!keyboard) return;
+    const onKey = (event: KeyboardEvent) => {
+      const target = event.target;
+      if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) return;
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      if (/^[0-9]$/.test(event.key)) {
+        event.preventDefault();
+        latest.current.tap(event.key);
+      } else if (event.key === 'Backspace') {
+        event.preventDefault();
+        latest.current.back();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [keyboard]);
+
   return (
     <div className={shake ? 'animate-shake' : ''}>
-      <div className="flex justify-center gap-3 mb-6">
-        {Array.from({ length }).map((_, i) => {
-          const filled = i < pin.length;
+      <div className="ws-pin-dots" aria-live="polite" aria-label={`${pin.length} of ${length} digits entered`} role="status">
+        {Array.from({ length }).map((_, index) => {
+          const filled = index < pin.length;
           return (
             <span
-              key={i}
-              className={`w-3.5 h-3.5 rounded-full transition-colors ${filled ? 'bg-gold' : 'bg-surface-2 border border-line-2'} ${bumping && i === pin.length - 1 ? 'scale-110' : ''}`}
-              style={{ transition: 'transform 80ms ease' }}
+              key={index}
+              className={`ws-pin-dot ${filled ? 'is-filled' : ''} ${bumping && index === pin.length - 1 ? 'is-bump' : ''}`}
             />
           );
         })}
       </div>
-      <div className="grid grid-cols-3 gap-2 max-w-xs mx-auto">
-        {[1,2,3,4,5,6,7,8,9].map((n) => (
-          <button
-            key={n}
-            onClick={() => tap(String(n))}
-            className="bg-surface-2 hover:bg-surface text-text font-display text-h1 font-semibold py-3 rounded-xl border border-line active:scale-95 transition-transform"
-          >
-            {n}
+      <div className="ws-pinpad">
+        {DIGITS.map((digit) => (
+          <button key={digit} type="button" onClick={() => tap(digit)} className="ws-pin-key">
+            {digit}
           </button>
         ))}
-        <span />
-        <button
-          onClick={() => tap('0')}
-          className="bg-surface-2 hover:bg-surface text-text font-display text-h1 font-semibold py-3 rounded-xl border border-line active:scale-95 transition-transform"
-        >
+        <span aria-hidden="true" />
+        <button type="button" onClick={() => tap('0')} className="ws-pin-key">
           0
         </button>
-        <button
-          onClick={back}
-          className="bg-surface-2 hover:bg-surface text-text-muted py-3 rounded-xl border border-line active:scale-95 transition-transform flex items-center justify-center"
-          aria-label="Backspace"
-        >
-          <Delete size={20} />
+        <button type="button" onClick={back} className="ws-pin-key is-icon" aria-label="Backspace">
+          <Delete size={22} aria-hidden="true" />
         </button>
       </div>
     </div>

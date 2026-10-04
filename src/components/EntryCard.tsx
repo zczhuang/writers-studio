@@ -1,46 +1,36 @@
 import type { Entry } from '../types';
 import { MODE_META } from '../data/prompts';
+import { MODE_THEME } from '../data/modeTheme';
+import { toneVars } from '../data/tones';
 import { prettyDate } from '../utils/date';
 import { gradingPresentation } from '../services/gradingPresentation';
+import { TierChip } from './TierChip';
 
 interface Props {
   entry: Entry;
   onClick?: () => void;
 }
 
-const TIER_TEXT_CLASS: Record<string, string> = {
-  none: 'text-text-faint',
-  bronze: 'text-tier-bronze',
-  silver: 'text-tier-silver',
-  gold: 'text-tier-gold',
-  platinum: 'text-tier-platinum',
-};
-
 export function EntryCard({ entry, onClick }: Props) {
   const meta = MODE_META[entry.mode];
-  const preview = entry.text.length > 180 ? entry.text.slice(0, 180).trimEnd() + '…' : entry.text;
+  const theme = MODE_THEME[entry.mode];
+  const preview = entry.text.length > 220 ? entry.text.slice(0, 220).trimEnd() + '…' : entry.text;
   const grade = gradingPresentation(entry);
+  const drafts = (entry.revisionCount ?? 0) + 1;
   return (
-    <button
-      onClick={onClick}
-      className="w-full text-left bg-surface border border-line rounded-xl p-4 hover:border-gold/30 transition-colors"
-    >
-      <div className="flex items-center justify-between text-caption mb-2">
-        <span className="text-text-muted font-medium">{meta.label} · {entry.challengeTitle}</span>
-        <span className="text-text-faint">{prettyDate(entry.createdAt)}</span>
-      </div>
-      <p className="font-serif text-body text-text mb-3 line-clamp-3">{preview}</p>
-      <div className="flex items-center gap-3 text-caption">
-        <span className={`font-semibold ${grade.available ? TIER_TEXT_CLASS[entry.judge.tier] : 'text-text-faint'}`}>{grade.tierText}</span>
-        {grade.available && (
-          <>
-            <span className="text-text-faint">·</span>
-            <span className="text-text-muted tabular-nums">{grade.scoreText}</span>
-          </>
-        )}
-        <span className="text-text-faint">·</span>
-        <span className="text-text-muted tabular-nums">{entry.wordCount} words</span>
-      </div>
+    <button type="button" onClick={onClick} className="ws-entry" style={toneVars(entry.mode)}>
+      <span className="ws-entry-head">
+        <span className="ws-entry-world"><theme.Icon size={13} aria-hidden="true" /> {meta.label}</span>
+        <span>{prettyDate(entry.createdAt)}</span>
+      </span>
+      <span className="ws-entry-title">{entry.challengeTitle}</span>
+      <span className="ws-entry-excerpt">{preview}</span>
+      <span className="ws-entry-foot">
+        <TierChip tier={grade.available ? entry.judge.tier : 'none'} label={grade.tierText} />
+        {grade.available && <span>{grade.scoreText}</span>}
+        <span>{entry.wordCount} words</span>
+        {drafts > 1 && <span>{drafts} drafts</span>}
+      </span>
     </button>
   );
 }

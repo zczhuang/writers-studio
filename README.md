@@ -2,7 +2,7 @@
 
 A writing-practice web app for writers ages 11–13 that **pays real money** for real work.
 
-- **Story atlas design** — an illustrated book-and-landscape welcome, warm paper surfaces, distinct writing worlds, and a responsive reading layout
+- **Midnight ink & gold leaf design** — a night-sky storybook look for big moments (home, rewards, lock screen) over warm paper for reading and writing; an illustrated scene for each writing world, tier medals, wax-seal badges, a ruled manuscript editor, and a desktop sidebar with a floating mobile dock. Fonts (Fraunces, Figtree, Literata) are self-hosted, so the app makes no third-party font requests and keeps its look offline
 - **Daily missions** — finish a piece, write 100 words, and explore two modes; completion is derived from saved entries and resets on the local calendar day
 - **Adventure trail** — five XP ranks from Apprentice to Author, with the next rank and remaining XP shown
 - **Writing worlds** — completion counts unique prompts, so repeating a challenge does not inflate the map
@@ -23,7 +23,7 @@ A writing-practice web app for writers ages 11–13 that **pays real money** for
 - Parent-pays-IRL ledger gated by a 4-digit PIN
 - Configurable daily cap ($0.50–$5.00)
 - Streaks, achievements, grace tokens, journal of every piece
-- **Optional private cloud history** — anonymous per-device Supabase auth, recovery-code linking, conflict-safe snapshots, immutable draft/revision history, and no child email/login
+- **Optional private cloud history** — anonymous per-device Supabase auth, recovery-code linking, conflict-safe snapshots, immutable draft/revision history, and no child email/login. Failed saves retry automatically, closing the tab flushes pending progress, and a device that loses its sign-in relinks itself with its stored recovery code
 
 Built with **Vite + React + TypeScript + Tailwind**. It remains an offline-first static SPA; a dedicated Supabase project can add private backup/sync.
 
@@ -59,7 +59,9 @@ VITE_SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
 VITE_SUPABASE_PUBLISHABLE_KEY=YOUR_PUBLISHABLE_KEY
 ```
 
-Cloud startup occurs only after the app access screen is unlocked. Blank new profiles do not create writer spaces or upload blank state. Existing local history is imported automatically; offline edits remain local and retry after reconnect. A parent can view/save the 256-bit recovery code or restore another device from Parent Settings. The four-digit app/parent PIN is never a cloud credential.
+Cloud startup occurs only after the app access screen is unlocked. Blank new profiles do not create writer spaces or upload blank state. Existing local history is imported automatically; offline edits remain local and retry after reconnect. Failed saves retry with backoff (4 s up to 5 min), hiding or closing the tab saves immediately, and a lost anonymous sign-in is relinked with the device's own recovery code. A parent can view/save the 256-bit recovery code or restore another device from Parent Settings, and the Parent dashboard shows where progress is saved. The four-digit app/parent PIN is never a cloud credential.
+
+> **Status:** no Supabase project is provisioned for this app yet, so production currently saves progress in each browser only. The Parent dashboard says so. See the setup checklist in [`docs/CLOUD-BACKUP.md`](docs/CLOUD-BACKUP.md).
 
 See [`docs/CLOUD-BACKUP.md`](docs/CLOUD-BACKUP.md) for schema, security, setup, recovery, reset, and live verification details.
 

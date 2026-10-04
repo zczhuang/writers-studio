@@ -1,26 +1,23 @@
 import { useCallback, useEffect, useState, type CSSProperties } from 'react';
-import { ArrowRight, Coins, Cpu, Home, PenLine, Quote, RefreshCw, Sparkles, TrendingUp, Trophy } from 'lucide-react';
+import { ArrowRight, CheckCircle2, Coins, Cpu, Home, Lightbulb, PenLine, RefreshCw, Sparkles, TrendingUp, Trophy } from 'lucide-react';
 import { useApp } from '../state/AppContext';
 import { TierReveal } from '../components/TierReveal';
 import { Button } from '../components/ui/Button';
 import { ProgressBar } from '../components/ui/ProgressBar';
 import { tierLabel } from '../services/scoring';
 import { DIMENSIONS, DIMENSION_ORDER } from '../data/dimensionTheme';
+import { tierVars, toneVars } from '../data/tones';
 import { WritingShapeRadar } from '../components/visuals/WritingShapeRadar';
 import { averageBreakdown, recommendSkill } from '../services/writerMemory';
 import { SkillCard } from '../components/SkillCard';
 import { DailyMissionList } from '../components/journey/DailyMissionList';
 import { useLocalToday } from '../components/journey/useLocalToday';
+import { TierMedal } from '../components/art/TierMedal';
+import { StarField } from '../components/art/StarField';
+import { Confetti } from '../components/art/Confetti';
 import { dailyMissions, levelUpSnapshot, rankSnapshot, xpForEntry } from '../utils/progression';
-import type { Tier } from '../types';
 
-const TIER_ACCENT: Record<Tier, string> = {
-  none: 'var(--text-faint)',
-  bronze: 'var(--tier-bronze)',
-  silver: 'var(--tier-silver)',
-  gold: 'var(--tier-gold)',
-  platinum: 'var(--tier-platinum)',
-};
+const rise = (index: number) => ({ '--i': index } as CSSProperties);
 
 export function ResultScreen() {
   const { state, dispatch } = useApp();
@@ -40,7 +37,6 @@ export function ResultScreen() {
   const actualAmount = ledger && Number.isFinite(ledger.amount) ? Math.max(0, ledger.amount) : 0;
   const isRevision = (entry.revisionCount ?? 0) > 0;
   const rewardStatus = ledger?.status === 'paid' ? 'paid' : ledger?.status === 'pending' ? 'pending' : 'practice';
-  const rewardStatusLabel = rewardStatus[0].toUpperCase() + rewardStatus.slice(1);
   const forfeited = ledger?.status === 'forfeited' && ledger.tier !== 'none';
   const xpGain = xpForEntry(entry);
   const levelState = levelUpSnapshot(state.writer.xp, xpGain);
@@ -59,103 +55,180 @@ export function ResultScreen() {
       {!revealDone && <TierReveal tier={judge.tier} amount={actualAmount} forfeited={forfeited} revision={isRevision} xpGained={xpGain} onDone={handleRevealDone} />}
 
       {revealDone && (
-        <div className="atlas-page animate-slide-up">
-          <section className="atlas-result-hero" style={{ '--result-accent': TIER_ACCENT[judge.tier] } as CSSProperties}>
-            <div className="atlas-result-kicker">Piece complete · {entry.challengeTitle}</div>
-            <h1 className="atlas-result-tier">{tierLabel(judge.tier)}</h1>
-            {isRevision ? (
-              <div className="atlas-result-reward" aria-label={`Best reward for this piece: ${actualAmount.toFixed(2)} dollars, ${rewardStatus}`}>
-                <span className="atlas-result-reward-label">Best reward for this piece</span>
-                <span className="atlas-result-reward-value"><Coins size={17} className="text-gold" aria-hidden="true" /> ${actualAmount.toFixed(2)}</span>
-                <span className="atlas-result-reward-status">{rewardStatusLabel}</span>
+        <div className="ws-page">
+          <section className="ws-result-hero ws-night ws-rise" style={tierVars(judge.tier)} aria-labelledby="result-tier">
+            <StarField seed={41} count={40} sparkles={4} />
+            <div className="ws-result-medal ws-float"><TierMedal tier={judge.tier} /></div>
+            <div className="ws-result-copy">
+              <div className="ws-result-piece">Piece complete · {entry.challengeTitle}</div>
+              <h1 id="result-tier" className="ws-result-tier">{tierLabel(judge.tier)}</h1>
+              <div className="ws-result-pills">
+                {isRevision ? (
+                  <span className="ws-result-pill is-money" aria-label={`Best reward for this piece: ${actualAmount.toFixed(2)} dollars, ${rewardStatus}`}>
+                    <Coins size={17} aria-hidden="true" /> ${actualAmount.toFixed(2)} <small>best reward · {rewardStatus}</small>
+                  </span>
+                ) : actualAmount > 0 ? (
+                  <span className="ws-result-pill is-money"><Coins size={17} aria-hidden="true" /> +${actualAmount.toFixed(2)}</span>
+                ) : null}
+                <span className="ws-result-pill"><Sparkles size={16} aria-hidden="true" /> +{xpGain} XP earned</span>
+                <span className="ws-result-pill"><Cpu size={15} aria-hidden="true" /> {judge.source === 'gemini' ? 'AI coach' : 'Local scoring'} <small>· {judge.score}/100</small></span>
               </div>
-            ) : actualAmount > 0 ? (
-              <div className="atlas-result-amount"><Coins size={18} className="text-gold inline-block mr-1" aria-hidden="true" /> +${actualAmount.toFixed(2)}</div>
-            ) : null}
-            {forfeited ? <p className="text-caption text-text-muted mt-2">Daily cap reached — this page counts for practice, no payment.</p> : actualAmount === 0 ? <p className="text-caption text-text-muted mt-2">Practice only — no payment was recorded for this page.</p> : null}
-            <span className="atlas-result-xp"><Sparkles size={15} aria-hidden="true" /> +{xpGain} XP earned</span>
-            <div className="mt-3 inline-flex items-center gap-1.5 text-micro uppercase tracking-wider px-2.5 py-1 rounded-full bg-surface border border-line text-text-muted">
-              <Cpu size={11} aria-hidden="true" />
-              <span>{judge.source === 'gemini' ? 'AI coach' : 'Local scoring'}</span>
-              <span className="text-text-faint">·</span>
-              <span className="tabular-nums">{judge.score}/100</span>
+              {forfeited ? (
+                <p className="ws-result-note">Daily cap reached, so this page counts for practice with no payment.</p>
+              ) : actualAmount === 0 ? (
+                <p className="ws-result-note">Practice only. No payment was recorded for this page.</p>
+              ) : null}
             </div>
           </section>
 
           {levelState.leveledUp && (
-            <section className="atlas-level-up" aria-live="polite">
-              <span className="atlas-level-up-mark" aria-hidden="true"><Trophy size={19} /></span>
-              <div><strong>You reached {levelState.currentLevel.name}.</strong><p>{levelState.previousLevel.name} → {levelState.currentLevel.name} · the next part of the map is open.</p></div>
+            <section className="ws-levelup ws-rise" style={rise(1)} aria-live="polite">
+              <Confetti />
+              <span className="ws-medallion ws-medallion--lg ws-medallion--solid" style={toneVars('gold')} aria-hidden="true"><Trophy size={24} /></span>
+              <div>
+                <strong>You reached {levelState.currentLevel.name}!</strong>
+                <p>{levelState.previousLevel.name} → {levelState.currentLevel.name}. The next part of the map is open.</p>
+              </div>
             </section>
           )}
-
-          <section className="atlas-panel" aria-labelledby="rank-progress-title">
-            <div className="atlas-section-heading">
-              <div><p className="atlas-kicker">Your route continues</p><h2 id="rank-progress-title" className="atlas-heading atlas-heading-small">{rank.level.name} rank progress</h2></div>
-              <span className="atlas-rank-value">{state.writer.xp.toLocaleString()} XP</span>
-            </div>
-            <ProgressBar pct={rank.pct} label={`${rank.level.name} rank progress`} />
-            <div className="atlas-rank-meta"><span>{rank.nextLevel ? `${rank.xpToNext} XP to ${rank.nextLevel.name}` : 'Final rank · Author'}</span><span>{Math.round(rank.pct)}%</span></div>
-          </section>
 
           {grew?.improved && (
-            <section className="atlas-level-up">
-              <TrendingUp size={19} className="text-moss shrink-0" aria-hidden="true" />
-              <div><strong className="text-moss">You grew.</strong><p>Last time your coach nudged your {DIMENSIONS[grew.dimension].kidLabel.toLowerCase()}, and this {grew.mode} piece is stronger there.</p></div>
+            <section className="ws-callout ws-callout--ok ws-rise" style={rise(2)}>
+              <TrendingUp size={19} aria-hidden="true" />
+              <div>
+                <strong className="font-display text-[1.1rem]">You grew.</strong>
+                <p className="m-0 mt-0.5">Last time your coach nudged your {DIMENSIONS[grew.dimension].kidLabel.toLowerCase()}, and this {grew.mode} piece is stronger there.</p>
+              </div>
             </section>
           )}
-
-          <DailyMissionList missions={missions} />
-
-          <section className="atlas-panel" aria-labelledby="writing-shape-title">
-            <div className="atlas-section-heading">
-              <div><p className="atlas-kicker">Coach feedback</p><h2 id="writing-shape-title" className="atlas-heading atlas-heading-small">Your writing shape</h2><p className="atlas-caption">{baseline ? 'This piece in gold · your usual shape in grey' : 'This piece across five skills'}</p></div>
-            </div>
-            <WritingShapeRadar current={judge.breakdown} baseline={baseline} />
-            <div className="space-y-2.5 mt-4 pt-4 border-t border-line">
-              {DIMENSION_ORDER.map((key) => {
-                const theme = DIMENSIONS[key];
-                const Glyph = theme.Glyph;
-                const value = Math.max(0, Math.min(10, judge.breakdown[key]));
-                return (
-                  <div key={key} className="flex items-center gap-3">
-                    <span className="flex items-center gap-1.5 w-28 shrink-0"><Glyph size={13} style={{ color: theme.color }} aria-hidden="true" /><span className="text-caption text-text-muted truncate">{theme.label}</span></span>
-                    <div className="flex-1 bg-surface-2 rounded-full h-2 overflow-hidden" role="progressbar" aria-label={`${theme.label} score`} aria-valuemin={0} aria-valuemax={10} aria-valuenow={value}><div className="h-full rounded-full" style={{ width: `${value * 10}%`, backgroundColor: theme.color }} /></div>
-                    <span className="font-mono text-caption font-semibold text-text tabular-nums w-8 text-right">{value}</span>
-                  </div>
-                );
-              })}
-            </div>
-          </section>
 
           {judge.celebrate && judge.tier !== 'none' && (
-            <section className="atlas-panel atlas-celebrate-panel">
-              <div className="flex items-start gap-2.5"><Quote size={18} className="text-gold shrink-0 mt-0.5" aria-hidden="true" /><div><div className="atlas-kicker">Line worth celebrating</div><p className="font-serif italic text-text leading-snug">&ldquo;{judge.celebrate}.&rdquo;</p></div></div>
+            <section className="ws-quote ws-rise" style={rise(3)}>
+              <div className="ws-kicker">A line worth celebrating</div>
+              <p>{judge.celebrate}.</p>
             </section>
           )}
 
-          <div className="atlas-two-column">
-            {judge.strengths.length > 0 && (
-              <section className="atlas-panel" aria-labelledby="worked-title"><div className="flex items-center gap-2 mb-2"><Sparkles size={16} className="text-moss" aria-hidden="true" /><h2 id="worked-title" className="atlas-heading atlas-heading-small">What worked</h2></div><ul className="space-y-2 text-caption text-text-muted font-serif">{judge.strengths.map((strength, index) => <li key={`${strength}-${index}`} className="flex gap-2"><span className="text-moss shrink-0">·</span><span>{strength}</span></li>)}</ul></section>
-            )}
-            {judge.suggestions.length > 0 && (
-              <section className="atlas-panel" aria-labelledby="next-title"><div className="flex items-center gap-2 mb-2"><PenLine size={16} className="text-gold" aria-hidden="true" /><h2 id="next-title" className="atlas-heading atlas-heading-small">Try next</h2></div><ul className="space-y-2 text-caption text-text-muted font-serif">{judge.suggestions.map((suggestion, index) => <li key={`${suggestion}-${index}`} className="flex gap-2"><span className="text-gold shrink-0">·</span><span>{suggestion}</span></li>)}</ul></section>
-            )}
+          <div className="ws-grid-2 is-even ws-rise" style={rise(4)}>
+            <section className="ws-card ws-card-pad" aria-labelledby="writing-shape-title">
+              <div className="ws-section-head">
+                <div>
+                  <p className="ws-kicker">Coach feedback</p>
+                  <h2 id="writing-shape-title" className="ws-h2">Your writing shape</h2>
+                </div>
+              </div>
+              <div className="ws-radar-wrap"><WritingShapeRadar current={judge.breakdown} baseline={baseline} /></div>
+              <div className="ws-legend" aria-hidden="true">
+                <span><i style={{ background: '#F2C45A', border: '2px solid #C98A1C' }} /> This piece</span>
+                {baseline && <span><i style={{ background: 'rgba(59, 66, 102, 0.12)', border: '2px dashed rgba(59, 66, 102, 0.55)' }} /> Your usual shape</span>}
+              </div>
+            </section>
+
+            <section className="ws-card ws-card-pad" aria-labelledby="skill-scores-title">
+              <div className="ws-section-head">
+                <div>
+                  <p className="ws-kicker">Five skills</p>
+                  <h2 id="skill-scores-title" className="ws-h2">Skill scores</h2>
+                </div>
+                <span className="ws-chip tabular" style={tierVars(judge.tier)}>{judge.score}/100</span>
+              </div>
+              <div className="ws-dim-bars">
+                {DIMENSION_ORDER.map((key) => {
+                  const theme = DIMENSIONS[key];
+                  const Glyph = theme.Glyph;
+                  const value = Math.max(0, Math.min(10, judge.breakdown[key]));
+                  return (
+                    <div key={key} className="ws-dim-bar" style={toneVars(key)}>
+                      <span className="ws-dim-bar-label"><Glyph size={15} aria-hidden="true" /><span>{theme.kidLabel}</span></span>
+                      <div className="ws-progress" role="progressbar" aria-label={`${theme.label} score`} aria-valuemin={0} aria-valuemax={10} aria-valuenow={value}>
+                        <span style={{ width: `${value * 10}%` }} />
+                      </div>
+                      <span className="ws-dim-bar-value">{value}</span>
+                    </div>
+                  );
+                })}
+              </div>
+              <hr className="ws-divider" />
+              <div className="ws-section-head" style={{ marginBottom: '0.6rem' }}>
+                <div>
+                  <p className="ws-kicker">Your route continues</p>
+                  <h3 className="ws-h3">{rank.level.name} rank</h3>
+                </div>
+                <span className="ws-small tabular">{state.writer.xp.toLocaleString()} XP</span>
+              </div>
+              <ProgressBar pct={rank.pct} label={`${rank.level.name} rank progress`} />
+              <div className="mt-2 flex justify-between text-[0.8rem] font-semibold text-text-muted">
+                <span>{rank.nextLevel ? `${rank.xpToNext} XP to ${rank.nextLevel.name}` : 'Final rank · Author'}</span>
+                <span className="tabular">{Math.round(rank.pct)}%</span>
+              </div>
+            </section>
           </div>
 
+          {(judge.strengths.length > 0 || judge.suggestions.length > 0) && (
+            <div className="ws-grid-2 is-even ws-rise" style={rise(5)}>
+              {judge.strengths.length > 0 && (
+                <section className="ws-card ws-card-pad" style={toneVars('success')} aria-labelledby="worked-title">
+                  <div className="flex items-center gap-3">
+                    <span className="ws-medallion ws-medallion--sm" aria-hidden="true"><CheckCircle2 size={17} /></span>
+                    <h2 id="worked-title" className="ws-h3">What worked</h2>
+                  </div>
+                  <ul className="ws-feedback-list">
+                    {judge.strengths.map((strength, index) => <li key={`${strength}-${index}`}><Sparkles size={15} aria-hidden="true" /><span>{strength}</span></li>)}
+                  </ul>
+                </section>
+              )}
+              {judge.suggestions.length > 0 && (
+                <section className="ws-card ws-card-pad" style={toneVars('gold')} aria-labelledby="next-title">
+                  <div className="flex items-center gap-3">
+                    <span className="ws-medallion ws-medallion--sm" aria-hidden="true"><Lightbulb size={17} /></span>
+                    <h2 id="next-title" className="ws-h3">Try next</h2>
+                  </div>
+                  <ul className="ws-feedback-list">
+                    {judge.suggestions.map((suggestion, index) => <li key={`${suggestion}-${index}`}><PenLine size={15} aria-hidden="true" /><span>{suggestion}</span></li>)}
+                  </ul>
+                </section>
+              )}
+            </div>
+          )}
+
           {canRevise && (
-            <section className="atlas-panel atlas-revision-panel">
-              <div className="flex items-start gap-3"><span className="shrink-0 rounded-lg p-2 bg-gold/15 text-gold"><RefreshCw size={20} aria-hidden="true" /></span><div className="flex-1 min-w-0"><h2 className="atlas-heading atlas-heading-small">Make it even better</h2><p className="text-caption text-text-muted mt-1 leading-snug">Revise this same piece with extra attention on your <span className="text-text font-semibold">{DIMENSIONS[reviseTarget].kidLabel.toLowerCase()}</span>. Your score may move either way; your best earned reward is retained, and the revision adds +8 effort XP.</p><Button variant="gold" size="sm" className="mt-3" onClick={() => dispatch({ type: 'START_REVISION', entryId: entry.id })}><RefreshCw size={15} aria-hidden="true" /> Revise &amp; resubmit</Button></div></div>
+            <section className="ws-revision ws-rise" style={toneVars(reviseTarget, rise(6))}>
+              <span className="ws-medallion ws-medallion--solid" aria-hidden="true"><RefreshCw size={20} /></span>
+              <div className="min-w-0 flex-1">
+                <h2 className="ws-h3">Make it even better</h2>
+                <p className="ws-small mt-1">
+                  Revise this same piece with extra attention on your <strong className="text-ink">{DIMENSIONS[reviseTarget].kidLabel.toLowerCase()}</strong>. Your score may move either way; your best earned reward is kept, and the revision adds +8 effort XP.
+                </p>
+                <Button variant="gold" size="sm" className="mt-3" onClick={() => dispatch({ type: 'START_REVISION', entryId: entry.id })}>
+                  <RefreshCw size={15} aria-hidden="true" /> Revise &amp; resubmit
+                </Button>
+              </div>
             </section>
           )}
 
+          <div className="ws-rise" style={rise(7)}>
+            <DailyMissionList missions={missions} />
+          </div>
+
           {recommended && (
-            <section aria-labelledby="trick-title"><div className="flex items-center gap-2 mb-2"><Sparkles size={16} className="text-gold" aria-hidden="true" /><h2 id="trick-title" className="atlas-heading atlas-heading-small">A trick to try next</h2></div><SkillCard card={recommended} compact onTryDrill={() => { dispatch({ type: 'MARK_SKILL_PRACTICED', id: recommended.id }); dispatch({ type: 'CLEAR_LAST_JUDGE' }); dispatch({ type: 'NAV_RESET', screen: 'craft-library' }); }} /></section>
+            <section aria-labelledby="trick-title" className="ws-rise" style={rise(8)}>
+              <div className="ws-section-head">
+                <div>
+                  <p className="ws-kicker">From the craft library</p>
+                  <h2 id="trick-title" className="ws-h2">A trick to try next</h2>
+                </div>
+              </div>
+              <SkillCard card={recommended} compact onTryDrill={() => { dispatch({ type: 'MARK_SKILL_PRACTICED', id: recommended.id }); dispatch({ type: 'CLEAR_LAST_JUDGE' }); dispatch({ type: 'NAV_RESET', screen: 'craft-library' }); }} />
+            </section>
           )}
 
-          <div className="flex gap-3 pt-2">
-            <Button variant="ghost" onClick={() => { dispatch({ type: 'CLEAR_LAST_JUDGE' }); dispatch({ type: 'NAV_RESET', screen: 'home' }); }} className="flex-1"><Home size={16} aria-hidden="true" /> Home</Button>
-            <Button variant="gold" onClick={() => { dispatch({ type: 'CLEAR_LAST_JUDGE' }); dispatch({ type: 'NAV_RESET', screen: 'mode-list' }); }} className="flex-[2]">Write another <ArrowRight size={16} aria-hidden="true" /></Button>
+          <div className="ws-write-actions">
+            <Button variant="ghost" onClick={() => { dispatch({ type: 'CLEAR_LAST_JUDGE' }); dispatch({ type: 'NAV_RESET', screen: 'home' }); }}>
+              <Home size={17} aria-hidden="true" /> Home
+            </Button>
+            <Button variant="gold" onClick={() => { dispatch({ type: 'CLEAR_LAST_JUDGE' }); dispatch({ type: 'NAV_RESET', screen: 'mode-list' }); }}>
+              Write another <ArrowRight size={17} aria-hidden="true" />
+            </Button>
           </div>
         </div>
       )}
