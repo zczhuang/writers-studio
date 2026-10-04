@@ -39,7 +39,7 @@ export function CloudStatusBadge() {
   const label = localProblem
     ? `${local.label}. ${local.detail}`
     : status.phase === 'saved'
-      ? 'Backed up to the cloud'
+      ? 'Cloud saved'
       : retryable
         ? `${status.message}. Tap to retry.`
         : status.phase === 'unavailable' || status.phase === 'device-only' || status.phase === 'setup-needed'

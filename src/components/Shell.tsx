@@ -147,6 +147,19 @@ export function Shell({ children }: { children: ReactNode }) {
             )}
             <span className="ws-topbar-spacer" />
             <div className="ws-topbar-actions">
+              {/* Always reachable, even with nothing to pay out, so a parent can open recovery on a fresh device. */}
+              {!focusMode && (
+                <button
+                  type="button"
+                  onClick={openParent}
+                  className={`ws-pill ws-parent-chip ${parent.active ? 'is-active' : ''}`}
+                  aria-label={isParent ? 'Open parent dashboard' : 'Unlock parent mode'}
+                  aria-current={state.screen === 'parent-dashboard' ? 'page' : undefined}
+                >
+                  <ShieldCheck size={15} aria-hidden="true" />
+                  <span className="ws-parent-label">Parent</span>
+                </button>
+              )}
               <CloudStatusBadge />
               <EarningsPill />
             </div>

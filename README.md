@@ -61,7 +61,7 @@ VITE_SUPABASE_PUBLISHABLE_KEY=YOUR_PUBLISHABLE_KEY
 
 Cloud startup occurs only after the app access screen is unlocked. Blank new profiles do not create writer spaces or upload blank state. Existing local history is imported automatically; offline edits remain local and retry after reconnect. Failed saves retry with backoff (4 s up to 5 min), hiding or closing the tab saves immediately, and a lost anonymous sign-in is relinked with the device's own recovery code. A parent can view/save the 256-bit recovery code or restore another device from Parent Settings, and the Parent dashboard shows where progress is saved. The four-digit app/parent PIN is never a cloud credential.
 
-> **Status:** no Supabase project is provisioned for this app yet, so production currently saves progress in each browser only. The Parent dashboard says so. See the setup checklist in [`docs/CLOUD-BACKUP.md`](docs/CLOUD-BACKUP.md).
+> **Status:** cloud backup has been live in production since 2026-10-04 (see [Production activation](docs/CLOUD-BACKUP.md#production-activation-2026-10-04)). A build without the two Supabase variables stays device-only, and the Parent dashboard says so.
 
 See [`docs/CLOUD-BACKUP.md`](docs/CLOUD-BACKUP.md) for schema, security, setup, recovery, reset, and live verification details.
 

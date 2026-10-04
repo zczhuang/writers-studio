@@ -1124,6 +1124,9 @@ textarea.writing-surface::placeholder { color: var(--ink-400); font-style: itali
 .ws-cloud.is-saved { color: var(--success); border-color: rgb(var(--success-rgb) / 0.3); }
 .ws-cloud.is-error { color: var(--danger); border-color: rgb(var(--danger-rgb) / 0.3); }
 .ws-cloud.is-saving, .ws-cloud.is-connecting { color: var(--gold-700); }
+.ws-parent-chip { gap: 0.35rem; padding: 0 0.8rem; color: var(--ink-700); font-size: 0.82rem; }
+.ws-parent-chip svg { color: var(--gold-700); }
+.ws-parent-chip.is-active { border-color: rgb(var(--gold-rgb) / 0.55); background: #FFFBEE; }
 .ws-night .ws-pill, .ws-sidebar .ws-pill { color: var(--night-text); background: rgba(255, 255, 255, 0.07); border-color: rgba(255, 255, 255, 0.14); }
 .ws-sidebar .ws-pill:hover:not(:disabled) { background: rgba(255, 255, 255, 0.12); }
 .ws-sidebar .ws-cloud.is-saved { color: #7FE0B8; }
@@ -1194,6 +1197,10 @@ textarea.writing-surface::placeholder { color: var(--ink-400); font-style: itali
 
 @media (max-width: 720px) {
   .ws-main { padding-top: 1.1rem; }
+  .ws-topbar.has-back .ws-brand-copy { display: none; }
+  .ws-pill .ws-pill-cap { display: none; }
+  .ws-parent-chip .ws-parent-label { display: none; }
+  .ws-parent-chip { width: 2.75rem; padding: 0; justify-content: center; }
   .ws-chapter { grid-template-columns: minmax(0, 1fr); }
   .ws-chapter-art { order: -1; min-height: 11rem; }
   .ws-chapter-art::after { background: linear-gradient(180deg, transparent 50%, rgba(0, 0, 0, 0.25)); }
@@ -1217,10 +1224,8 @@ textarea.writing-surface::placeholder { color: var(--ink-400); font-style: itali
 @media (max-width: 520px) {
   .ws-topbar-inner { gap: 0.4rem; }
   .ws-topbar .ws-brand-sub { display: none; }
-  .ws-topbar.has-back .ws-brand-copy { display: none; }
   .ws-cloud .ws-cloud-label { display: none; }
   .ws-cloud { width: 2.75rem; padding: 0; justify-content: center; }
-  .ws-pill .ws-pill-cap { display: none; }
   .ws-hero { padding: 1.25rem; border-radius: 1.6rem; }
   .ws-hero-actions .ws-btn { flex: 1 1 100%; }
   .ws-stat { padding: 0.85rem; column-gap: 0.65rem; }
@@ -1251,8 +1256,11 @@ textarea.writing-surface::placeholder { color: var(--ink-400); font-style: itali
   .ws-toggle-grid { grid-template-columns: minmax(0, 1fr); }
 }
 
-@media (max-width: 360px) {
+@media (max-width: 440px) {
   .ws-topbar .ws-brand-copy { display: none; }
+}
+
+@media (max-width: 360px) {
   .ws-worlds { grid-template-columns: minmax(0, 1fr); }
   .ws-stat { grid-template-columns: minmax(0, 1fr); padding: 0.8rem; }
   .ws-stat .ws-medallion { display: none; }
