@@ -1,4 +1,5 @@
 import type { BadgeDef } from '../types';
+import { hasValidGrading } from '../services/writerMemory';
 
 export const BADGES: BadgeDef[] = [
   {
@@ -34,21 +35,21 @@ export const BADGES: BadgeDef[] = [
     icon: 'Star',
     name: 'Silver Strike',
     desc: 'Earn your first Silver tier',
-    check: (s) => s.entries.some((e) => e.judge.tier === 'silver' || e.judge.tier === 'gold' || e.judge.tier === 'platinum'),
+    check: (s) => s.entries.some((e) => hasValidGrading(e) && (e.judge.tier === 'silver' || e.judge.tier === 'gold' || e.judge.tier === 'platinum')),
   },
   {
     id: 'gold1',
     icon: 'Medal',
     name: 'Gold Standard',
     desc: 'Earn your first Gold tier',
-    check: (s) => s.entries.some((e) => e.judge.tier === 'gold' || e.judge.tier === 'platinum'),
+    check: (s) => s.entries.some((e) => hasValidGrading(e) && (e.judge.tier === 'gold' || e.judge.tier === 'platinum')),
   },
   {
     id: 'platinum1',
     icon: 'Crown',
     name: 'Platinum Page',
     desc: 'Earn your first Platinum tier',
-    check: (s) => s.entries.some((e) => e.judge.tier === 'platinum'),
+    check: (s) => s.entries.some((e) => hasValidGrading(e) && e.judge.tier === 'platinum'),
   },
   {
     id: 'words500',

@@ -3,6 +3,7 @@ import { dimensionsForChallenge } from '../data/promptSkills';
 import { MODE_META, POOLS } from '../data/prompts';
 import { LEVELS, getLevel, levelProgress } from '../data/levels';
 import { isoFromTimestamp } from './date';
+import { hasValidGrading } from '../services/writerMemory';
 
 export const MODE_ORDER: Mode[] = ['scene', 'story', 'mystery', 'upgrade'];
 
@@ -241,9 +242,9 @@ export function badgeProgress(
     case 'streak3': return { current: Math.min(3, writer.streak), target: 3, detail: `${Math.min(3, writer.streak)} of 3 days` };
     case 'streak7': return { current: Math.min(7, writer.streak), target: 7, detail: `${Math.min(7, writer.streak)} of 7 days` };
     case 'streak14': return { current: Math.min(14, writer.streak), target: 14, detail: `${Math.min(14, writer.streak)} of 14 days` };
-    case 'silver1': return { current: entries.some((entry) => TIER_RANK[entry.judge.tier] >= 2) ? 1 : 0, target: 1, detail: 'First Silver page' };
-    case 'gold1': return { current: entries.some((entry) => TIER_RANK[entry.judge.tier] >= 3) ? 1 : 0, target: 1, detail: 'First Gold page' };
-    case 'platinum1': return { current: entries.some((entry) => TIER_RANK[entry.judge.tier] >= 4) ? 1 : 0, target: 1, detail: 'First Platinum page' };
+    case 'silver1': return { current: entries.some((entry) => hasValidGrading(entry) && TIER_RANK[entry.judge.tier] >= 2) ? 1 : 0, target: 1, detail: 'First Silver page' };
+    case 'gold1': return { current: entries.some((entry) => hasValidGrading(entry) && TIER_RANK[entry.judge.tier] >= 3) ? 1 : 0, target: 1, detail: 'First Gold page' };
+    case 'platinum1': return { current: entries.some((entry) => hasValidGrading(entry) && TIER_RANK[entry.judge.tier] >= 4) ? 1 : 0, target: 1, detail: 'First Platinum page' };
     case 'words500': return { current: Math.min(500, writer.totalWords), target: 500, detail: `${Math.min(500, writer.totalWords).toLocaleString()} of 500 words` };
     case 'words2000': return { current: Math.min(2000, writer.totalWords), target: 2000, detail: `${Math.min(2000, writer.totalWords).toLocaleString()} of 2,000 words` };
     case 'words5000': return { current: Math.min(5000, writer.totalWords), target: 5000, detail: `${Math.min(5000, writer.totalWords).toLocaleString()} of 5,000 words` };

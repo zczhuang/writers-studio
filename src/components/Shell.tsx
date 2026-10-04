@@ -4,6 +4,7 @@ import { useApp } from '../state/AppContext';
 import { EarningsPill } from './EarningsPill';
 import { ToastHost } from './ui/Toast';
 import type { Screen } from '../types';
+import { CloudStatusBadge } from './CloudStatusBadge';
 
 const HIDE_NAV_ON: Screen[] = ['onboarding', 'write', 'result', 'parent-gate'];
 
@@ -55,7 +56,10 @@ export function Shell({ children }: { children: ReactNode }) {
               {isParent && <span className="text-caption font-sans text-gold-deep">· parent</span>}
             </div>
           </div>
-          <EarningsPill />
+          <div className="atlas-header-actions">
+            <CloudStatusBadge />
+            <EarningsPill />
+          </div>
         </div>
       </header>
 

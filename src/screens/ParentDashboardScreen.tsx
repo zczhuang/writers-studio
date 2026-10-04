@@ -4,13 +4,13 @@ import { useApp } from '../state/AppContext';
 import { useDailyCap } from '../hooks/useDailyCap';
 import { Button } from '../components/ui/Button';
 import { prettyDate } from '../utils/date';
-import { tierLabel } from '../services/scoring';
 import { DIMENSIONS } from '../data/dimensionTheme';
 import { WritingShapeRadar } from '../components/visuals/WritingShapeRadar';
 import { DimensionSparklines } from '../components/visuals/DimensionSparklines';
-import { averageBreakdown } from '../services/writerMemory';
+import { averageBreakdown, entriesWithLatestValidGrading } from '../services/writerMemory';
 import { browserDeadlineRuntime, parentAccessIsActive, startDeadlineWatcher } from '../services/accessTiming';
 import type { Screen } from '../types';
+import { gradingPresentation } from '../services/gradingPresentation';
 
 const TIER_TEXT: Record<string, string> = {
   none: 'text-text-faint',
@@ -54,13 +54,16 @@ export function ParentDashboardScreen() {
 
   const week = state.entries.filter((e) => authNow - e.createdAt < 7 * 86_400_000);
   const month = state.entries.filter((e) => authNow - e.createdAt < 30 * 86_400_000);
-  const avg = (arr: typeof state.entries) =>
-    arr.length === 0 ? 0 : Math.round(arr.reduce((s, e) => s + e.judge.score, 0) / arr.length);
+  const avg = (arr: typeof state.entries) => {
+    const graded = entriesWithLatestValidGrading(arr);
+    return graded.length === 0 ? null : Math.round(graded.reduce((sum, entry) => sum + entry.judge.score, 0) / graded.length);
+  };
 
   const { memory } = state;
-  const hasGrowthView = state.entries.length >= 2;
+  const gradedEntries = entriesWithLatestValidGrading(state.entries);
+  const hasGrowthView = gradedEntries.length >= 2;
   // "When they started" baseline: average of their earliest pieces.
-  const startShape = state.entries.length >= 4 ? averageBreakdown(state.entries.slice(0, 5)) : undefined;
+  const startShape = gradedEntries.length >= 4 ? averageBreakdown(gradedEntries.slice(0, 5)) ?? undefined : undefined;
 
   return (
     <div className="space-y-5 animate-slide-up">
@@ -90,8 +93,8 @@ export function ParentDashboardScreen() {
         <h2 className="font-display text-h3 font-semibold text-text mb-3">Activity</h2>
         <div className="grid grid-cols-3 gap-3 text-caption">
           <Stat label="Today" value={`$${cap.earnedToday.toFixed(2)}`} sub={`/ $${cap.cap.toFixed(2)}`} />
-          <Stat label="This week" value={`${week.length}`} sub={`avg ${avg(week)}`} />
-          <Stat label="This month" value={`${month.length}`} sub={`avg ${avg(month)}`} />
+          <Stat label="This week" value={`${week.length}`} sub={`avg ${avg(week) ?? '—'}`} />
+          <Stat label="This month" value={`${month.length}`} sub={`avg ${avg(month) ?? '—'}`} />
         </div>
       </section>
 
@@ -132,25 +135,28 @@ export function ParentDashboardScreen() {
         {recent.length === 0 ? (
           <p className="text-caption text-text-muted py-4">No entries yet.</p>
         ) : (
-          recent.map((e) => (
-            <button
-              key={e.id}
-              onClick={() => dispatch({ type: 'NAV', screen: 'journal' })}
-              className="w-full text-left bg-surface border border-line rounded-xl p-3 hover:border-gold/30 transition-colors"
-            >
-              <div className="flex justify-between text-caption text-text-muted">
-                <span className="truncate">{e.challengeTitle}</span>
-                <span className="shrink-0">{prettyDate(e.createdAt)}</span>
-              </div>
-              <div className="flex items-center gap-2 text-micro mt-1">
-                <span className={`uppercase tracking-wider font-semibold ${TIER_TEXT[e.judge.tier]}`}>
-                  {tierLabel(e.judge.tier)}
-                </span>
-                <span className="text-text-faint">·</span>
-                <span className="text-text-faint tabular-nums">{e.judge.score}/100 · {e.wordCount} words</span>
-              </div>
-            </button>
-          ))
+          recent.map((e) => {
+            const grade = gradingPresentation(e);
+            return (
+              <button
+                key={e.id}
+                onClick={() => dispatch({ type: 'NAV', screen: 'journal' })}
+                className="w-full text-left bg-surface border border-line rounded-xl p-3 hover:border-gold/30 transition-colors"
+              >
+                <div className="flex justify-between text-caption text-text-muted">
+                  <span className="truncate">{e.challengeTitle}</span>
+                  <span className="shrink-0">{prettyDate(e.createdAt)}</span>
+                </div>
+                <div className="flex items-center gap-2 text-micro mt-1">
+                  <span className={`uppercase tracking-wider font-semibold ${grade.available ? TIER_TEXT[e.judge.tier] : 'text-text-faint'}`}>
+                    {grade.tierText}
+                  </span>
+                  <span className="text-text-faint">·</span>
+                  <span className="text-text-faint tabular-nums">{grade.available ? `${grade.scoreText} · ` : ''}{e.wordCount} words</span>
+                </div>
+              </button>
+            );
+          })
         )}
       </section>
 

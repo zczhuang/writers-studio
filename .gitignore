@@ -26,6 +26,7 @@ dist-ssr
 # Env / secrets — never commit API keys
 .env
 .env.*
+!.env.example
 *.pem
 
 # Vercel

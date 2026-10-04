@@ -16,6 +16,7 @@ import { SettingsScreen } from './screens/SettingsScreen';
 import { OnboardingScreen } from './screens/OnboardingScreen';
 import { BADGES } from './data/badges';
 import { pushToast } from './hooks/useToast';
+import { CloudSyncProvider } from './cloud/CloudSyncContext';
 
 export function App() {
   const [unlocked, setUnlocked] = useState<boolean>(() => {
@@ -23,7 +24,11 @@ export function App() {
   });
 
   if (!unlocked) return <AppLockScreen onUnlock={() => setUnlocked(true)} />;
-  return <UnlockedApp />;
+  return (
+    <CloudSyncProvider>
+      <UnlockedApp />
+    </CloudSyncProvider>
+  );
 }
 
 function UnlockedApp() {

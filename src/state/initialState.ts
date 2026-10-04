@@ -1,9 +1,10 @@
 import type { AppState } from '../types';
 import { emptyMemory } from '../services/writerMemory';
+import { makeProgressHistory } from './progress';
 
 export const STORAGE_KEY = 'ws_state_v2';
 export const DRAFT_PREFIX = 'ws_draft_';
-export const CURRENT_VERSION = 3 as const;
+export const CURRENT_VERSION = 4 as const;
 
 export function makeInitialState(): AppState {
   return {
@@ -39,6 +40,7 @@ export function makeInitialState(): AppState {
       capBehavior: 'forfeit',
       audienceAge: 12,
     },
+    progress: makeProgressHistory(),
     screen: 'home',
     navStack: [],
     currentMode: null,

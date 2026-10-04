@@ -12,7 +12,7 @@ A writing-practice web app for writers ages 11–13 that **pays real money** for
 - Four writing modes (Scene, Story, Mystery, Word Upgrade) with 34 prompts
 - AI coach via **Google Gemini** (`gemini-3.1-flash-lite` by default) grades each piece on 5 dimensions: vocabulary, imagery, voice, structure, originality
 - Heuristic fallback works fully offline
-- **Persistent writer-memory** — the coach remembers each writer across sessions (per-dimension mastery, growth edge, a vocabulary vault) and personalizes feedback. Memory is stored on the device. When the Gemini coach is enabled, selected derived coaching context is sent with the writing; the context instructs the coach to personalize feedback without changing the rubric score. Submission delimiters help separate writing from instructions.
+- **Persistent writer-memory** — the coach remembers each writer across sessions (per-dimension mastery, growth edge, a vocabulary vault) and personalizes feedback. Memory is stored offline-first and, when configured, included in the writer's private cloud backup. When the Gemini coach is enabled, selected derived coaching context is sent with the writing; the context instructs the coach to personalize feedback without changing the rubric score. Submission delimiters help separate writing from instructions.
 - **"Did you grow?"** — the coach recalls the skill it last nudged and celebrates real improvement
 - **Craft Skills library** — 14 fact-checked mini-lessons from great writers (classic public-domain mentor texts + modern techniques), with a memory-driven "recommended for you" card targeting the writer's weakest dimension
 - **Revise & resubmit** — improve the same piece (up to 2×) aimed at your weakest dimension; feedback reflects the latest draft while recorded earnings are preserved
@@ -23,8 +23,9 @@ A writing-practice web app for writers ages 11–13 that **pays real money** for
 - Parent-pays-IRL ledger gated by a 4-digit PIN
 - Configurable daily cap ($0.50–$5.00)
 - Streaks, achievements, grace tokens, journal of every piece
+- **Optional private cloud history** — anonymous per-device Supabase auth, recovery-code linking, conflict-safe snapshots, immutable draft/revision history, and no child email/login
 
-Built with **Vite + React + TypeScript + Tailwind**. Static SPA — no backend.
+Built with **Vite + React + TypeScript + Tailwind**. It remains an offline-first static SPA; a dedicated Supabase project can add private backup/sync.
 
 See [`docs/BENCHMARK-AND-BUILD.md`](docs/BENCHMARK-AND-BUILD.md) for the category benchmark and roadmap behind the latest features.
 
@@ -47,8 +48,23 @@ Output goes to `dist/`. Deployable to any static host (Vercel, Netlify, GitHub P
 
 The Gemini API key is **never** committed — it lives in the browser's localStorage on the user's device. Get a free key at <https://aistudio.google.com/apikey> and paste it during onboarding or in Settings.
 
-Writing, earnings, and progress are saved in this browser. With Gemini enabled, the submitted piece, challenge, audience age, and selected derived coaching context are sent to Google for feedback. Without a key, or when the coach is unavailable, scoring runs locally.
+Writing, earnings, and progress are persisted in this browser first, with visible recovery/quota status if browser storage cannot verify the write. With Gemini enabled, the submitted piece, challenge, audience age, and selected derived coaching context are sent to Google for feedback. Without a key, or when the coach is unavailable, scoring runs locally.
+
+## Private cloud backup (optional)
+
+Copy `.env.example` to a local `.env`, set the dedicated project's public URL and publishable key, enable anonymous sign-ins in Supabase Auth, and apply the additive migration in `supabase/migrations/`. Never put a service-role key in this app.
+
+```bash
+VITE_SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=YOUR_PUBLISHABLE_KEY
+```
+
+Cloud startup occurs only after the app access screen is unlocked. Blank new profiles do not create writer spaces or upload blank state. Existing local history is imported automatically; offline edits remain local and retry after reconnect. A parent can view/save the 256-bit recovery code or restore another device from Parent Settings. The four-digit app/parent PIN is never a cloud credential.
+
+See [`docs/CLOUD-BACKUP.md`](docs/CLOUD-BACKUP.md) for schema, security, setup, recovery, reset, and live verification details.
 
 ## Revision rewards
 
 Revisions keep the original journal entry and add a small XP bonus. A higher tier can increase an unpaid reward from the same local day, within the remaining daily cap. Paid rewards, closed rewards, and rewards from earlier days stay unchanged; those revisions are for practice. The latest draft can receive different feedback without reducing its recorded earnings.
+
+Earlier drafts and concurrent revision conflicts remain read-only in Journal. Restoring or importing history hydrates state directly and never replays submit/revise reward actions.

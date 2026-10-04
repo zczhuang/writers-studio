@@ -47,7 +47,7 @@ export function ResultScreen() {
   const rank = rankSnapshot(state.writer.xp);
   const missions = dailyMissions(state.entries, today);
   const baselineEntries = state.entries.filter((candidate) => candidate.id !== entry.id);
-  const baseline = baselineEntries.length > 0 ? averageBreakdown(baselineEntries) : undefined;
+  const baseline = averageBreakdown(baselineEntries) ?? undefined;
   const latestEntry = state.entries[state.entries.length - 1];
   const grew = latestEntry?.id === entry.id && state.memory.lastGrowth?.mode === entry.mode ? state.memory.lastGrowth : null;
   const recommended = recommendSkill(state.memory, state.craft.masteredSkills);

@@ -35,6 +35,38 @@ export interface Entry {
   earningsId: string;
   /** How many times this piece has been revised and resubmitted (0 = first draft). */
   revisionCount?: number;
+  /** Immutable drafts retained for Journal/history and safe multi-device merging. */
+  versions?: EntryVersion[];
+  /** The version currently shown as the entry's latest draft. */
+  currentVersionId?: string;
+  /** Exact first-submit facts. Missing on legacy revisions whose original was already lost. */
+  firstDraft?: FirstDraftFacts;
+  /** False when a damaged legacy grade was replaced with a UI-safe placeholder. */
+  gradingComplete?: boolean;
+}
+
+export type EntryVersionKind = 'first-draft' | 'revision' | 'legacy-current' | 'conflict';
+
+export interface EntryVersion {
+  id: string;
+  entryId: string;
+  parentVersionId: string | null;
+  revision: number;
+  kind: EntryVersionKind;
+  createdAt: number;
+  text: string;
+  wordCount: number;
+  judge: JudgeResult;
+  gradingComplete: boolean;
+  /** Additive progress attached to this unique version; never inferred from a later draft. */
+  xpDelta: number;
+}
+
+export interface FirstDraftFacts {
+  versionId: string;
+  createdAt: number;
+  wordCount: number;
+  xpAwarded: number;
 }
 
 export interface LedgerEntry {
@@ -129,6 +161,43 @@ export interface Settings {
   audienceAge: number;
 }
 
+export type ProgressOperationKind = 'entry-submit' | 'entry-revision';
+
+/** Immutable post-baseline counter change. IDs make retries and device merges idempotent. */
+export interface ProgressOperation {
+  id: string;
+  baselineId: string;
+  kind: ProgressOperationKind;
+  entryId: string;
+  versionId: string;
+  createdAt: number;
+  xpDelta: number;
+  totalWordsDelta: number;
+  totalChallengesDelta: number;
+}
+
+/** Exact totals imported from a legacy/local snapshot. Different baselines are never summed. */
+export interface ProgressBaseline {
+  id: string;
+  createdAt: number;
+  provenance: 'fresh' | 'legacy-local' | 'cloud' | 'import' | 'reconciled';
+  fingerprint: string;
+  xp: number;
+  totalWords: number;
+  totalChallenges: number;
+}
+
+export interface ProgressHistory {
+  /** A reset rotates both values. Old cloud responses cannot cross this fence. */
+  lineageId: string;
+  generation: string;
+  baseline: ProgressBaseline;
+  /** Ambiguous legacy baselines are retained for audit/recovery but not added together. */
+  baselineConflicts: ProgressBaseline[];
+  operations: ProgressOperation[];
+  updatedAt: number;
+}
+
 export type Screen =
   | 'home'
   | 'mode-list'
@@ -144,13 +213,14 @@ export type Screen =
   | 'onboarding';
 
 export interface AppState {
-  version: 3;
+  version: 4;
   writer: WriterState;
   earnings: Earnings;
   entries: Entry[];
   memory: WriterMemory;
   craft: CraftState;
   settings: Settings;
+  progress: ProgressHistory;
   // Ephemeral (not persisted):
   screen: Screen;
   navStack: Screen[];

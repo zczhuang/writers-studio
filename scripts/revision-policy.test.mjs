@@ -564,7 +564,7 @@ class MemoryStorage {
   }
 }
 
-test('v2 hydration preserves money, writing, PIN, and totals while backfilling v3 memory and craft', (t) => {
+test('v2 hydration preserves money, writing, PIN, and totals while backfilling v4 history, memory, and craft', (t) => {
   const originalStorage = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
   const storage = new MemoryStorage();
   Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: storage });
@@ -615,15 +615,20 @@ test('v2 hydration preserves money, writing, PIN, and totals while backfilling v
   const hydrated = hydrate();
 
   assert.equal(STORAGE_KEY, 'ws_state_v2');
-  assert.equal(CURRENT_VERSION, 3);
-  assert.equal(hydrated.version, 3);
+  assert.equal(CURRENT_VERSION, 4);
+  assert.equal(hydrated.version, 4);
   assert.equal(hydrated.writer.name, 'Leeann');
   assert.equal(hydrated.writer.xp, 345);
   assert.equal(hydrated.writer.totalWords, 987);
   assert.equal(hydrated.writer.totalChallenges, 12);
   assert.deepEqual(hydrated.earnings, v2.earnings);
-  assert.deepEqual(hydrated.entries, [entry]);
-  assert.equal('revisionCount' in hydrated.entries[0], false);
+  assert.equal(hydrated.entries.length, 1);
+  assert.equal(hydrated.entries[0].id, entry.id);
+  assert.equal(hydrated.entries[0].text, entry.text);
+  assert.equal(hydrated.entries[0].wordCount, entry.wordCount);
+  assert.equal(hydrated.entries[0].revisionCount, 0);
+  assert.equal(hydrated.entries[0].versions.length, 1);
+  assert.equal(hydrated.entries[0].versions[0].kind, 'legacy-current');
   assert.equal(hydrated.settings.parentPinHash, 'preserved-pin-hash');
   assert.equal(hydrated.settings.parentPinSalt, 'preserved-pin-salt');
   assert.equal(hydrated.settings.dailyCapDollars, 2.75);
@@ -634,6 +639,10 @@ test('v2 hydration preserves money, writing, PIN, and totals while backfilling v
   assert.equal(hydrated.memory.bestScore, entry.judge.score);
   assert.equal(hydrated.memory.updatedAt, entry.createdAt);
   assert.deepEqual(hydrated.craft, { practicedSkills: [], masteredSkills: [] });
+  assert.equal(hydrated.progress.baseline.xp, 345);
+  assert.equal(hydrated.progress.baseline.totalWords, 987);
+  assert.equal(hydrated.progress.baseline.totalChallenges, 12);
+  assert.deepEqual(hydrated.progress.operations, []);
   assert.equal(hydrated.screen, 'home');
   assert.deepEqual(hydrated.navStack, []);
   assert.equal(hydrated.currentMode, null);

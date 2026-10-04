@@ -1,23 +1,33 @@
-import { createContext, useContext, useEffect, useEffectEvent, useMemo, useReducer } from 'react';
+import { createContext, useContext, useEffect, useEffectEvent, useMemo, useReducer, useState } from 'react';
 import type { Dispatch, ReactNode } from 'react';
 import type { AppState } from '../types';
 import { reducer } from './reducer';
 import type { Action } from './actions';
-import { hydrate, persist } from './persistence';
+import { hydrateWithResult, persistWithResult, type LocalPersistenceHealth } from './persistence';
 
 interface Ctx {
   state: AppState;
   dispatch: Dispatch<Action>;
+  localPersistence: LocalPersistenceHealth;
 }
 
 const AppContext = createContext<Ctx | null>(null);
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [state, dispatch] = useReducer(reducer, undefined, hydrate);
-  const persistLatest = useEffectEvent(() => persist(state));
+  const [hydration] = useState(hydrateWithResult);
+  const [state, dispatch] = useReducer(reducer, hydration.state);
+  const [localPersistence, setLocalPersistence] = useState(hydration.persistence);
+  const persistLatest = useEffectEvent(() => persistWithResult(state));
 
   useEffect(() => {
-    persistLatest();
+    let current = true;
+    const result = persistLatest();
+    queueMicrotask(() => {
+      if (current) setLocalPersistence(result);
+    });
+    return () => {
+      current = false;
+    };
   }, [
     state.writer,
     state.earnings,
@@ -25,6 +35,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     state.memory,
     state.craft,
     state.settings,
+    state.progress,
     state.version,
   ]);
 
@@ -35,7 +46,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [state.settings.parentPinHash, state.screen]);
 
-  const ctx = useMemo(() => ({ state, dispatch }), [state]);
+  const ctx = useMemo(() => ({ state, dispatch, localPersistence }), [state, localPersistence]);
   return <AppContext.Provider value={ctx}>{children}</AppContext.Provider>;
 }
 

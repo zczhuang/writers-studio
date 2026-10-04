@@ -6,14 +6,43 @@ import { getSkillCard } from '../data/skillCards';
 import { canReviseEntry, resolveRevisionReward } from '../services/revision';
 import { resolveFreshReward } from '../services/dailyCap';
 import { isoFromTimestamp } from '../utils/date';
+import { appendProgressOperation, touchProgress } from './progress';
+import { ensureEntryVersions, makeFirstDraftVersion, makeRevisionVersion } from './normalization';
+import { stableId } from '../utils/stable';
 
-const MAX_ENTRIES = 500;
 const RECENT_SKILLS_CAP = 3;
+
+function versionIdExists(state: AppState, versionId: string): boolean {
+  return state.entries.some((entry) => ensureEntryVersions(entry).some((version) => version.id === versionId));
+}
 
 export function reducer(state: AppState, action: Action): AppState {
   switch (action.type) {
     case 'HYDRATE': {
       return { ...state, ...action.payload };
+    }
+
+    case 'APPLY_SYNC_STATE': {
+      const incoming = action.payload;
+      return {
+        ...incoming,
+        // A cloud/import merge is data hydration, not navigation or authentication.
+        screen: state.screen,
+        navStack: state.navStack,
+        currentMode: state.currentMode,
+        currentChallengeId: state.currentChallengeId,
+        lastJudge: state.lastJudge,
+        lastEntryId: state.lastEntryId,
+        revisingEntryId: state.revisingEntryId,
+        parentUnlockedUntil: state.parentUnlockedUntil,
+        parentGateTarget: state.parentGateTarget,
+        settings: {
+          ...incoming.settings,
+          parentPinHash: state.settings.parentPinHash,
+          parentPinSalt: state.settings.parentPinSalt,
+          geminiApiKey: state.settings.geminiApiKey,
+        },
+      };
     }
 
     case 'NAV': {
@@ -45,6 +74,21 @@ export function reducer(state: AppState, action: Action): AppState {
     }
 
     case 'SUBMIT_ENTRY': {
+      const entryId = typeof action.entry.id === 'string' ? action.entry.id.trim() : '';
+      const ledgerId = typeof action.ledger.id === 'string' ? action.ledger.id.trim() : '';
+      const firstVersionId = `draft-${entryId}`;
+      const operationId = `submit:${entryId}`;
+      if (
+        !entryId
+        || !ledgerId
+        || state.entries.some((entry) => entry.id === entryId || entry.earningsId === ledgerId)
+        || state.earnings.ledger.some((row) => row.id === ledgerId || row.entryId === entryId)
+        || versionIdExists(state, firstVersionId)
+        || state.progress.operations.some((operation) =>
+          operation.id === operationId || operation.entryId === entryId || operation.versionId === firstVersionId
+        )
+      ) return state;
+
       const submittedAt = Date.now();
       const reward = resolveFreshReward({
         ledgerEntries: state.earnings.ledger,
@@ -57,11 +101,13 @@ export function reducer(state: AppState, action: Action): AppState {
 
       const entry = {
         ...action.entry,
+        id: entryId,
+        earningsId: ledgerId,
         date: isoFromTimestamp(submittedAt),
         createdAt: submittedAt,
       };
       const ledger = {
-        id: action.ledger.id,
+        id: ledgerId,
         entryId: entry.id,
         amount: reward.amount,
         tier: entry.judge.tier,
@@ -119,8 +165,21 @@ export function reducer(state: AppState, action: Action): AppState {
         modesPlayed,
       };
 
-      const entries = [...state.entries, entry];
-      if (entries.length > MAX_ENTRIES) entries.splice(0, entries.length - MAX_ENTRIES);
+      const firstVersion = makeFirstDraftVersion(entry, xpGain);
+      const storedEntry = {
+        ...entry,
+        revisionCount: 0,
+        gradingComplete: true,
+        versions: [firstVersion],
+        currentVersionId: firstVersion.id,
+        firstDraft: {
+          versionId: firstVersion.id,
+          createdAt: entry.createdAt,
+          wordCount: entry.wordCount,
+          xpAwarded: xpGain,
+        },
+      };
+      const entries = [...state.entries, storedEntry];
 
       const ledgerList = [...state.earnings.ledger, ledger];
       const lifetimePaid = ledgerList.filter((l) => l.status === 'paid').reduce((s, l) => s + l.amount, 0);
@@ -130,10 +189,20 @@ export function reducer(state: AppState, action: Action): AppState {
         ...state,
         writer: newWriter,
         entries,
-        memory: foldEntry(state.memory, entry),
+        memory: foldEntry(state.memory, storedEntry),
         earnings: { ledger: ledgerList, lifetimePaid, lifetimePending },
-        lastJudge: entry.judge,
-        lastEntryId: entry.id,
+        progress: appendProgressOperation(state.progress, {
+          id: operationId,
+          kind: 'entry-submit',
+          entryId: storedEntry.id,
+          versionId: firstVersion.id,
+          createdAt: submittedAt,
+          xpDelta: xpGain,
+          totalWordsDelta: storedEntry.wordCount,
+          totalChallengesDelta: 1,
+        }),
+        lastJudge: storedEntry.judge,
+        lastEntryId: storedEntry.id,
       };
     }
 
@@ -156,8 +225,26 @@ export function reducer(state: AppState, action: Action): AppState {
 
     case 'REVISE_ENTRY': {
       const { entryId, text, wordCount, judge } = action;
+      if (typeof entryId !== 'string' || !entryId.trim()) return state;
       const originalEntry = state.entries.find((e) => e.id === entryId);
       if (!canReviseEntry(originalEntry)) return state;
+
+      const priorVersions = ensureEntryVersions(originalEntry);
+      if (action.revisionVersionId !== undefined && (typeof action.revisionVersionId !== 'string' || !action.revisionVersionId.trim())) return state;
+      const revisionVersionId = action.revisionVersionId ?? `revision-${entryId}-${stableId({
+        text,
+        wordCount,
+        judge,
+      })}`;
+      const operationId = `revision:${entryId}:${revisionVersionId}`;
+      if (
+        versionIdExists(state, revisionVersionId)
+        || state.progress.operations.some((operation) => operation.id === operationId || operation.versionId === revisionVersionId)
+      ) return state;
+
+      const now = Date.now();
+      const revisedAt = action.occurredAt ?? now;
+      const revisionVersion = makeRevisionVersion(originalEntry, revisionVersionId, revisedAt, text, wordCount, judge);
 
       const originalLedger = state.earnings.ledger.find((l) => l.id === originalEntry.earningsId);
       const reward = resolveRevisionReward({
@@ -165,11 +252,22 @@ export function reducer(state: AppState, action: Action): AppState {
         ledgerEntries: state.earnings.ledger,
         candidateTier: judge.tier,
         dailyCapDollars: state.settings.dailyCapDollars,
-        nowMs: Date.now(),
+        nowMs: now,
       });
 
       const entries = state.entries.map((e) =>
-        e.id === entryId ? { ...e, text, wordCount, judge, revisionCount: (e.revisionCount ?? 0) + 1 } : e
+        e.id === entryId
+          ? {
+              ...e,
+              text,
+              wordCount,
+              judge,
+              gradingComplete: true,
+              revisionCount: (e.revisionCount ?? 0) + 1,
+              versions: [...priorVersions, revisionVersion],
+              currentVersionId: revisionVersion.id,
+            }
+          : e
       );
 
       let earnings = state.earnings;
@@ -205,6 +303,16 @@ export function reducer(state: AppState, action: Action): AppState {
         earnings,
         memory,
         writer,
+        progress: appendProgressOperation(state.progress, {
+          id: operationId,
+          kind: 'entry-revision',
+          entryId,
+          versionId: revisionVersion.id,
+          createdAt: revisedAt,
+          xpDelta: 8,
+          totalWordsDelta: 0,
+          totalChallengesDelta: 0,
+        }),
         lastJudge: judge,
         lastEntryId: entryId,
         revisingEntryId: null,
@@ -216,7 +324,7 @@ export function reducer(state: AppState, action: Action): AppState {
     }
 
     case 'SET_SETTINGS': {
-      return { ...state, settings: { ...state.settings, ...action.settings } };
+      return { ...state, settings: { ...state.settings, ...action.settings }, progress: touchProgress(state.progress) };
     }
 
     case 'UNLOCK_PARENT': {
@@ -246,11 +354,11 @@ export function reducer(state: AppState, action: Action): AppState {
       );
       const lifetimePaid = ledger.filter((l) => l.status === 'paid').reduce((s, l) => s + l.amount, 0);
       const lifetimePending = ledger.filter((l) => l.status === 'pending').reduce((s, l) => s + l.amount, 0);
-      return { ...state, earnings: { ledger, lifetimePaid, lifetimePending } };
+      return { ...state, earnings: { ledger, lifetimePaid, lifetimePending }, progress: touchProgress(state.progress, now) };
     }
 
     case 'UPDATE_WRITER': {
-      return { ...state, writer: { ...state.writer, ...action.patch } };
+      return { ...state, writer: { ...state.writer, ...action.patch }, progress: touchProgress(state.progress) };
     }
 
     case 'UNLOCK_ACHIEVEMENTS': {
@@ -261,6 +369,7 @@ export function reducer(state: AppState, action: Action): AppState {
       return {
         ...state,
         writer: { ...state.writer, achievements: [...state.writer.achievements, ...newOnes] },
+        progress: touchProgress(state.progress, now),
       };
     }
 
@@ -279,6 +388,7 @@ export function reducer(state: AppState, action: Action): AppState {
         ...state,
         craft: { ...state.craft, practicedSkills: practiced },
         memory: { ...state.memory, recentlyShownSkills: recent, lastSkillSource: card?.source ?? state.memory.lastSkillSource },
+        progress: touchProgress(state.progress),
       };
     }
 
@@ -289,7 +399,7 @@ export function reducer(state: AppState, action: Action): AppState {
       const practiced = state.craft.practicedSkills.includes(action.id)
         ? state.craft.practicedSkills
         : [...state.craft.practicedSkills, action.id];
-      return { ...state, craft: { practicedSkills: practiced, masteredSkills: mastered } };
+      return { ...state, craft: { practicedSkills: practiced, masteredSkills: mastered }, progress: touchProgress(state.progress) };
     }
 
     case 'RESET_ALL': {

@@ -34,6 +34,9 @@ const TREND_LABEL: Record<ReturnType<typeof trendOf>, string> = {
 /** Five small trend lines — one per grading dimension — over recent pieces. */
 export function DimensionSparklines({ entries, window = 8 }: Props) {
   const series = dimensionSeries(entries, window);
+  if (DIMENSION_ORDER.every((dimension) => series[dimension].length === 0)) {
+    return <p className="text-caption text-text-faint">Skill trends need graded writing. Recovered pieces with unavailable grades are still kept in Journal.</p>;
+  }
 
   return (
     <div className="space-y-2">
@@ -41,7 +44,7 @@ export function DimensionSparklines({ entries, window = 8 }: Props) {
         const theme = DIMENSIONS[d];
         const Glyph = theme.Glyph;
         const data = series[d];
-        const latest = data.length ? data[data.length - 1] : 0;
+        const latest = data.length ? data[data.length - 1] : null;
         const trend = trendOf(data);
         return (
           <div key={d} className="flex items-center gap-3">
@@ -51,7 +54,7 @@ export function DimensionSparklines({ entries, window = 8 }: Props) {
             </span>
             <svg viewBox={`0 0 ${W} ${H}`} width={W} height={H} className="shrink-0" aria-hidden>
               <path d={path(data)} fill="none" stroke={theme.color} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
-              {data.length > 0 && (
+              {latest !== null && (
                 <circle
                   cx={W}
                   cy={H - (Math.max(0, Math.min(10, latest)) / 10) * (H - 4) - 2}
@@ -60,8 +63,8 @@ export function DimensionSparklines({ entries, window = 8 }: Props) {
                 />
               )}
             </svg>
-            <span className="font-mono text-caption text-text tabular-nums w-6 text-right">{latest}</span>
-            <span className="text-micro uppercase tracking-wide text-text-faint w-16 hidden sm:inline">{TREND_LABEL[trend]}</span>
+            <span className="font-mono text-caption text-text tabular-nums w-6 text-right">{latest ?? '—'}</span>
+            <span className="text-micro uppercase tracking-wide text-text-faint w-16 hidden sm:inline">{latest === null ? 'no grades' : TREND_LABEL[trend]}</span>
           </div>
         );
       })}

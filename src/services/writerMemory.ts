@@ -18,6 +18,56 @@ const DIM_LABEL: Record<keyof JudgeBreakdown, string> = {
 const ALPHA = 0.35;
 const VAULT_CAP = 40;
 
+export function hasValidGrading(entry: unknown): boolean {
+  if (!entry || typeof entry !== 'object') return false;
+  const candidate = entry as Partial<Entry>;
+  const judge = candidate.judge;
+  const breakdown = judge?.breakdown;
+  return (
+    candidate.gradingComplete !== false &&
+    !!judge &&
+    typeof judge.score === 'number' &&
+    Number.isFinite(judge.score) &&
+    judge.score >= 0 &&
+    judge.score <= 100 &&
+    !!breakdown &&
+    DIMS.every((dimension) =>
+      typeof breakdown[dimension] === 'number'
+      && Number.isFinite(breakdown[dimension])
+      && breakdown[dimension] >= 0
+      && breakdown[dimension] <= 10
+    )
+  );
+}
+
+/**
+ * Returns one real grading fact per piece. If the latest draft is unavailable,
+ * an older, explicitly graded version can still support coaching/history without
+ * making the unavailable latest draft look graded.
+ */
+export function entryWithLatestValidGrading(entry: Entry): Entry | null {
+  if (hasValidGrading(entry)) return entry;
+  const version = [...(entry.versions ?? [])]
+    .filter((candidate) => candidate.kind !== 'conflict' && hasValidGrading(candidate))
+    .sort((left, right) =>
+      right.revision - left.revision
+      || right.createdAt - left.createdAt
+      || right.id.localeCompare(left.id)
+    )[0];
+  if (!version) return null;
+  return {
+    ...entry,
+    text: version.text,
+    wordCount: version.wordCount,
+    judge: version.judge,
+    gradingComplete: true,
+  };
+}
+
+export function entriesWithLatestValidGrading(entries: Entry[]): Entry[] {
+  return entries.map(entryWithLatestValidGrading).filter((entry): entry is Entry => entry !== null);
+}
+
 /** Common 7+ letter words that aren't "vivid" — kept out of the vocabulary vault. */
 const COMMON_LONG = new Set([
   'because', 'through', 'thought', 'something', 'someone', 'anything', 'everyone', 'everything',
@@ -81,6 +131,7 @@ function mergeVault(existing: string[], text: string): string[] {
  * for this mode, BEFORE updating the EWMA.
  */
 export function foldEntry(memory: WriterMemory, entry: Entry): WriterMemory {
+  if (!hasValidGrading(entry)) return memory;
   const b = entry.judge.breakdown;
   const first = memory.sampleCount === 0;
   const alpha = first ? 1 : ALPHA;
@@ -116,7 +167,7 @@ export function foldEntry(memory: WriterMemory, entry: Entry): WriterMemory {
 /** Rebuild memory from scratch over a list of entries (used by the v2→v3 migration). */
 export function buildMemory(entries: Entry[]): WriterMemory {
   let m = emptyMemory();
-  for (const e of [...entries].sort((a, b) => a.createdAt - b.createdAt)) m = foldEntry(m, e);
+  for (const e of entriesWithLatestValidGrading(entries).sort((a, b) => a.createdAt - b.createdAt)) m = foldEntry(m, e);
   return m;
 }
 
@@ -180,10 +231,10 @@ export function recommendSkill(memory: WriterMemory, masteredIds: string[] = [])
 // ── Chart helpers (read straight from entries; keep memory small) ──────────────
 
 /** Average of each dimension over the last `n` entries — the radar baseline. */
-export function averageBreakdown(entries: Entry[], n = 20): JudgeBreakdown {
-  const slice = entries.slice(-n);
+export function averageBreakdown(entries: Entry[], n = 20): JudgeBreakdown | null {
+  const slice = entriesWithLatestValidGrading(entries).slice(-n);
   const out: JudgeBreakdown = { vocabulary: 0, imagery: 0, voice: 0, structure: 0, originality: 0 };
-  if (slice.length === 0) return out;
+  if (slice.length === 0) return null;
   for (const e of slice) for (const d of DIMS) out[d] += e.judge.breakdown[d];
   for (const d of DIMS) out[d] = +(out[d] / slice.length).toFixed(2);
   return out;
@@ -191,7 +242,7 @@ export function averageBreakdown(entries: Entry[], n = 20): JudgeBreakdown {
 
 /** Per-dimension series over the last `n` entries — for sparklines. */
 export function dimensionSeries(entries: Entry[], n = 8): Record<keyof JudgeBreakdown, number[]> {
-  const slice = entries.slice(-n);
+  const slice = entriesWithLatestValidGrading(entries).slice(-n);
   const out = { vocabulary: [], imagery: [], voice: [], structure: [], originality: [] } as Record<
     keyof JudgeBreakdown,
     number[]
